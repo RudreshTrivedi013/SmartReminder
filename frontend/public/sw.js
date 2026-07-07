@@ -152,7 +152,7 @@ self.addEventListener('notificationclick', (event) => {
   // For this setup, we'll use the VITE_API_URL if possible, but SW doesn't have process.env.
   // We'll use /api as a generic base and assume Vite proxy handles it, or fallback to localhost:8000.
   // In a real prod environment, this would be injected during build time, but we'll use a dynamic approach.
-  const apiBaseUrl = self.location.hostname === 'localhost' ? 'http://localhost:8000' : self.location.origin
+  const apiBaseUrl = self.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://smartreminder-production-9096.up.railway.app';
 
   if (event.action === 'done') {
     event.waitUntil(
