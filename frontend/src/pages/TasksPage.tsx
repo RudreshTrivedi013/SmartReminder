@@ -10,13 +10,13 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center select-none">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center select-none">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-text-primary">All Reminders</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-text-primary">All Reminders</h1>
           <p className="text-sm text-text-secondary">View and manage your complete checklist.</p>
         </div>
 
-        <button onClick={() => setIsCreateOpen(true)} className="btn-primary flex items-center gap-1.5 py-2">
+        <button onClick={() => setIsCreateOpen(true)} className="btn-primary w-full sm:w-auto flex items-center justify-center gap-1.5 py-2">
           <Plus size={18} /> New Reminder
         </button>
       </div>

@@ -129,19 +129,19 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl select-none">
+    <div className="space-y-6 w-full max-w-2xl select-none">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-text-primary">Settings</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-text-primary">Settings</h1>
         <p className="text-sm text-text-secondary">Configure app preferences and notification endpoints.</p>
       </div>
 
       {/* Account Info */}
-      <div className="glass-card p-5 space-y-4">
+      <div className="glass-card p-4 sm:p-5 space-y-4">
         <h2 className="text-sm font-bold uppercase tracking-wider text-text-secondary">Account Profile</h2>
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-text-muted">Email address</p>
-            <p className="text-text-primary font-medium mt-0.5">{user?.email}</p>
+            <p className="text-text-primary font-medium mt-0.5 break-all">{user?.email}</p>
           </div>
           <div>
             <p className="text-text-muted flex items-center gap-1">
@@ -156,44 +156,44 @@ export default function SettingsPage() {
       </div>
 
       {/* Notification Preferences */}
-      <div className="glass-card p-5 space-y-5">
+      <div className="glass-card p-4 sm:p-5 space-y-5">
         <h2 className="text-sm font-bold uppercase tracking-wider text-text-secondary">Notifications & Preferences</h2>
         
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
               <p className="text-sm font-medium text-text-primary">Daily Summaries</p>
               <p className="text-xs text-text-muted">Receive an AI-generated summary at the end of the day</p>
             </div>
             <button
               onClick={() => handleSettingChange('daily_summary_enabled', !settings.daily_summary_enabled)}
-              className="text-primary hover:opacity-80 transition-opacity"
+              className="text-primary hover:opacity-80 transition-opacity shrink-0"
             >
               {settings.daily_summary_enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} className="text-text-muted" />}
             </button>
           </div>
           
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
               <p className="text-sm font-medium text-text-primary">Task Reminders</p>
               <p className="text-xs text-text-muted">Receive alerts when tasks are due</p>
             </div>
             <button
               onClick={() => handleSettingChange('reminders_enabled', !settings.reminders_enabled)}
-              className="text-primary hover:opacity-80 transition-opacity"
+              className="text-primary hover:opacity-80 transition-opacity shrink-0"
             >
               {settings.reminders_enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} className="text-text-muted" />}
             </button>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
               <p className="text-sm font-medium text-text-primary">Productivity Check-ins</p>
               <p className="text-xs text-text-muted">Interactive reminders to track your focus</p>
             </div>
             <button
               onClick={() => handleSettingChange('checkin_enabled', !settings.checkin_enabled)}
-              className="text-primary hover:opacity-80 transition-opacity"
+              className="text-primary hover:opacity-80 transition-opacity shrink-0"
             >
               {settings.checkin_enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} className="text-text-muted" />}
             </button>
@@ -206,7 +206,7 @@ export default function SettingsPage() {
               <Clock size={12} /> Check-in Schedule
             </h3>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-text-secondary mb-1">Working Hours Start</label>
                 <input
@@ -248,7 +248,7 @@ export default function SettingsPage() {
           <button 
             onClick={handleSaveSettings} 
             disabled={savingSettings}
-            className="btn-primary py-2 px-4 text-sm disabled:opacity-50"
+            className="btn-primary w-full sm:w-auto py-2 px-4 text-sm disabled:opacity-50"
           >
             {savingSettings ? 'Saving...' : 'Save Preferences'}
           </button>
@@ -256,8 +256,8 @@ export default function SettingsPage() {
       </div>
 
       {/* Push setup */}
-      <div className="glass-card p-5 space-y-4">
-        <div className="flex justify-between items-start gap-4">
+      <div className="glass-card p-4 sm:p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4">
           <div className="space-y-1">
             <h2 className="text-sm font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
               <Bell size={14} /> Web Push Notifications
@@ -266,15 +266,15 @@ export default function SettingsPage() {
               Register this browser window to receive alerts for upcoming reminders when the app tab is offline or closed.
             </p>
           </div>
-          <button onClick={handleRegisterPush} className="btn-secondary py-1.5 px-3 text-xs shrink-0 whitespace-nowrap">
+          <button onClick={handleRegisterPush} className="btn-secondary w-full sm:w-auto py-1.5 px-3 text-xs shrink-0 whitespace-nowrap">
             Enable Push
           </button>
         </div>
       </div>
 
       {/* Registered Devices */}
-      <div className="glass-card p-5 space-y-4">
-        <div className="flex items-center justify-between">
+      <div className="glass-card p-4 sm:p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-bold uppercase tracking-wider text-text-secondary">Connected Devices</h2>
           <button
             onClick={handleTestPush}
@@ -297,7 +297,7 @@ export default function SettingsPage() {
             ) : (
               <div className="space-y-1.5">
                 {testPushResult.results?.map((r: any) => (
-                  <div key={r.device_id} className="flex items-center gap-2 text-xs text-text-secondary">
+                  <div key={r.device_id} className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
                     {r.status === 'sent' ? (
                       <CheckCircle size={14} className="text-success shrink-0" />
                     ) : (
@@ -322,13 +322,13 @@ export default function SettingsPage() {
         ) : (
           <div className="space-y-3">
             {devices.map((d) => (
-              <div key={d.id} className="flex justify-between items-center p-3 border border-border/40 rounded-xl bg-white/[0.01]">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-text-secondary">
+              <div key={d.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 p-3 border border-border/40 rounded-xl bg-white/[0.01]">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-white/5 flex items-center justify-center text-text-secondary">
                     <Laptop size={18} />
                   </div>
-                  <div>
-                    <p className="text-xs font-mono text-text-secondary truncate max-w-[150px] sm:max-w-[200px]">
+                  <div className="min-w-0">
+                    <p className="text-xs font-mono text-text-secondary truncate max-w-[200px] sm:max-w-[200px]">
                       {d.id}
                     </p>
                     <p className="text-[10px] text-text-muted">
@@ -337,7 +337,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 justify-between sm:justify-end shrink-0">
                   {d.is_primary && (
                     <span className="text-[9px] bg-primary/10 border border-primary/20 text-primary uppercase font-bold tracking-wider px-1.5 py-0.5 rounded">
                       Primary

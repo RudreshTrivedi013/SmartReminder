@@ -14,10 +14,10 @@ export default function SignupPage() {
   }, [isAuthenticated, navigate])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg relative px-4 overflow-hidden select-none">
+    <div className="min-h-screen flex items-center justify-center bg-bg relative px-4 py-8 overflow-hidden select-none">
       {/* Background glow effects */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl" />
+      <div className="absolute top-1/4 left-1/4 w-56 h-56 sm:w-96 sm:h-96 bg-primary/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-1/4 right-1/4 w-56 h-56 sm:w-96 sm:h-96 bg-accent/10 rounded-full blur-3xl" />
 
       <SignupForm />
     </div>

@@ -20,46 +20,46 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center select-none">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center select-none">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-text-primary">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-text-primary">
             Hello, {user?.email.split('@')[0]}
           </h1>
           <p className="text-sm text-text-secondary">Here is your schedule for today.</p>
         </div>
 
-        <button onClick={() => setIsCreateOpen(true)} className="btn-primary flex items-center gap-1.5 py-2">
+        <button onClick={() => setIsCreateOpen(true)} className="btn-primary w-full sm:w-auto flex items-center justify-center gap-1.5 py-2">
           <Plus size={18} /> New Reminder
         </button>
       </div>
 
       {/* Grid Stats */}
-      <div className="grid grid-cols-3 gap-4 select-none">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 select-none">
         <div className="glass-card p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+          <div className="w-10 h-10 shrink-0 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
             <Clock size={20} />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-xs text-text-muted uppercase tracking-wider font-semibold">Pending</p>
             <p className="text-xl font-bold text-text-primary">{pendingCount}</p>
           </div>
         </div>
 
         <div className="glass-card p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center text-accent">
+          <div className="w-10 h-10 shrink-0 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center text-accent">
             <Sparkles size={20} />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-xs text-text-muted uppercase tracking-wider font-semibold">In Progress</p>
             <p className="text-xl font-bold text-text-primary">{inProgressCount}</p>
           </div>
         </div>
 
         <div className="glass-card p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-success/10 border border-success/20 flex items-center justify-center text-success">
+          <div className="w-10 h-10 shrink-0 rounded-lg bg-success/10 border border-success/20 flex items-center justify-center text-success">
             <CheckCircle2 size={20} />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-xs text-text-muted uppercase tracking-wider font-semibold">Completed</p>
             <p className="text-xl font-bold text-text-primary">{completedTodayCount}</p>
           </div>
