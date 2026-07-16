@@ -7,7 +7,7 @@
  * After both steps (or skipping step 2), the panel closes automatically.
  */
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X,
@@ -28,6 +28,7 @@ import {
   PenLine,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { tasksApi } from '@/api/tasks'
 import { useVoiceInput } from '@/hooks/useVoiceInput'
 import { companionApi } from '@/api/companion'
 import { voiceApi } from '@/api/voice'
@@ -118,6 +119,19 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
   const [textInput, setTextInput] = useState('')
   const [isSubmittingStatus, setIsSubmittingStatus] = useState(false)
   const [statusDone, setStatusDone] = useState(false)
+  // Pending checkin data (deferred submission until step 2 completes)
+  const [pendingCheckin, setPendingCheckin] = useState<{
+    status: ProductivityStatus
+    start_at: string
+    end_at: string
+    transcript?: string | null
+    source?: string | null
+  } | null>(null)
+
+  // Task selection state for attaching existing task
+  const [showTaskPicker, setShowTaskPicker] = useState(false)
+  const [availableTasks, setAvailableTasks] = useState<any[] | null>(null)
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
 
   // ── Step 2: Voice-task state ─────────────────────────────────────────────
   const [isParsingVoice, setIsParsingVoice] = useState(false)
@@ -183,29 +197,24 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
     const now = new Date()
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000)
 
-    setIsSubmittingStatus(true)
-    try {
-      await companionApi.createCheckin({
-        status: selectedStatus,
-        start_at: oneHourAgo.toISOString(),
-        end_at: now.toISOString(),
-        transcript: effectiveTranscript || null,
-        source: effectiveTranscript ? source : null,
-      })
-      const statusCfg = STATUS_OPTIONS.find((s) => s.value === selectedStatus)!
-      toast.success(`${statusCfg.emoji} Check-in saved — ${statusCfg.label}`)
-      setStatusDone(true)
-      // Stop any ongoing recording before moving to step 2
-      if (isRecording) stopRecording()
-      setTimeout(() => {
-        setStep('task')
-        setTaskMode('pick')
-      }, 900)
-    } catch (err) {
-      toast.error(parseApiError(err))
-    } finally {
-      setIsSubmittingStatus(false)
-    }
+    // Defer submission until user finishes step 2 so we can attach a task_id
+    setPendingCheckin({
+      status: selectedStatus,
+      start_at: oneHourAgo.toISOString(),
+      end_at: now.toISOString(),
+      transcript: effectiveTranscript || null,
+      source: effectiveTranscript ? source : null,
+    })
+
+    const statusCfg = STATUS_OPTIONS.find((s) => s.value === selectedStatus)!
+    toast.success(`${statusCfg.emoji} Check-in ready — ${statusCfg.label}`)
+    setStatusDone(true)
+    // Stop any ongoing recording before moving to step 2
+    if (isRecording) stopRecording()
+    setTimeout(() => {
+      setStep('task')
+      setTaskMode('pick')
+    }, 600)
   }, [selectedStatus, isSubmittingStatus, statusInputMode, effectiveTranscript, isRecording, stopRecording])
 
   // ── Step 2: Parse voice transcript for task ───────────────────────────────
@@ -224,13 +233,39 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
     }
   }, [transcript])
 
+  // Submit the deferred checkin (called after task selection/creation or skip)
+  const submitPendingCheckin = useCallback(
+    async (taskId: string | null = null) => {
+      if (!pendingCheckin) return
+      setIsSubmittingStatus(true)
+      try {
+        await companionApi.createCheckin({
+          status: pendingCheckin.status,
+          start_at: pendingCheckin.start_at,
+          end_at: pendingCheckin.end_at,
+          transcript: pendingCheckin.transcript ?? null,
+          source: pendingCheckin.source ?? null,
+          task_id: taskId ?? undefined,
+        } as any)
+        toast.success('✅ Check-in saved')
+        setPendingCheckin(null)
+        onClose()
+      } catch (err) {
+        toast.error(parseApiError(err))
+      } finally {
+        setIsSubmittingStatus(false)
+      }
+    },
+    [pendingCheckin, onClose]
+  )
+
   // ── Step 2: Create task via text form ─────────────────────────────────────
 
   const handleCreateTextTask = useCallback(async () => {
     if (!taskTitle.trim()) return
     setIsCreatingTask(true)
     try {
-      await createTask.mutateAsync({
+      const created = await createTask.mutateAsync({
         title: taskTitle.trim(),
         due_at: taskDueAt ? new Date(taskDueAt).toISOString() : null,
         recurrence: 'none',
@@ -239,7 +274,8 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
         notes: [],
       })
       toast.success('Task created!')
-      onClose()
+      // Attach the created task to the pending checkin and submit
+      await submitPendingCheckin(String(created.id))
     } catch (err) {
       toast.error(parseApiError(err))
     } finally {
@@ -521,12 +557,21 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
                             </div>
                           </button>
                         </div>
-                        <button
-                          onClick={onClose}
-                          className="w-full flex items-center justify-center gap-2 py-2.5 text-xs text-text-muted hover:text-text-secondary transition-all"
-                        >
-                          <SkipForward size={13} /> Skip — I'm done
-                        </button>
+                        <div className="space-y-2">
+                          <button
+                            onClick={() => setShowTaskPicker(true)}
+                            className="w-full flex items-center justify-center gap-2 py-2.5 text-sm btn-ghost"
+                          >
+                            <ListPlus size={14} /> Choose existing task
+                          </button>
+
+                          <button
+                            onClick={() => submitPendingCheckin(null)}
+                            className="w-full flex items-center justify-center gap-2 py-2.5 text-xs text-text-muted hover:text-text-secondary transition-all"
+                          >
+                            <SkipForward size={13} /> Skip — I'm done
+                          </button>
+                        </div>
                       </motion.div>
                     )}
 
@@ -740,6 +785,77 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
           }}
         />
       )}
+      {/* Task picker modal (renders on top when requested) */}
+      {showTaskPicker && (
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-60 flex items-end sm:items-center justify-center p-4 bg-black/50"
+            onClick={(e) => e.target === e.currentTarget && setShowTaskPicker(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="glass-card w-full max-w-md p-4 border border-border"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold">Choose a task</h3>
+                <button onClick={() => setShowTaskPicker(false)} className="text-text-muted">Close</button>
+              </div>
+              <TaskPickerContent />
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>
+      )}
     </>
   )
-}
+  
+  // Task picker content (hookable inside component)
+  function TaskPickerContent() {
+    useEffect(() => {
+      let mounted = true
+      ;(async () => {
+        try {
+          const list = await tasksApi.list(0, 50)
+          if (!mounted) return
+          // Filter out completed/blocked tasks
+          setAvailableTasks(list.filter((t: any) => !['done', 'blocked'].includes(t.status)))
+        } catch (err) {
+          toast.error('Failed to load tasks')
+          setAvailableTasks([])
+        }
+      })()
+      return () => {
+        mounted = false
+      }
+    }, [])
+
+    return (
+      <div className="space-y-2 max-h-72 overflow-auto">
+        {availableTasks === null ? (
+          <p className="text-sm text-text-muted">Loading…</p>
+        ) : availableTasks.length === 0 ? (
+          <p className="text-sm text-text-muted">No open tasks found.</p>
+        ) : (
+          availableTasks.map((t: any) => (
+            <button
+              key={t.id}
+              onClick={() => submitPendingCheckin(String(t.id))}
+              className="w-full text-left p-2 rounded hover:bg-white/5"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-medium text-text-primary">{t.title}</div>
+                  <div className="text-xs text-text-muted">{t.status}</div>
+                </div>
+                <div className="text-xs text-text-muted">Select</div>
+              </div>
+            </button>
+          ))
+        )}
+      </div>
+    )
+  }
