@@ -90,6 +90,22 @@ async def list_tasks(
     return list(result.scalars().unique().all())
 
 
+@router.get("/recent", response_model=list[TaskOut])
+async def recent_tasks(
+    limit: int = 1,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Task)
+        .where(Task.user_id == user.id)
+        .order_by(Task.created_at.desc())
+        .options(selectinload(Task.notes))
+        .limit(limit)
+    )
+    return list(result.scalars().unique().all())
+
+
 @router.patch("/{task_id}", response_model=TaskOut)
 async def update_task(task_id: UUID, payload: TaskUpdate, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     task = await task_service.get_task_for_user(db, task_id, user.id)

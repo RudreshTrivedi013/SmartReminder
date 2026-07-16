@@ -35,8 +35,9 @@ import { voiceApi } from '@/api/voice'
 import { useCreateTask } from '@/hooks/useTasks'
 import { parseApiError } from '@/lib/utils'
 import type { ProductivityStatus } from '@/types/companion'
+import type { Task, ParsedVoiceResult } from '@/types/api'
 import { ParsedTaskPreview } from '@/components/voice/ParsedTaskPreview'
-import type { ParsedVoiceResult } from '@/types/api'
+import { TaskEditModal } from '@/components/tasks/TaskEditModal'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -113,6 +114,11 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
   const [taskMode, setTaskMode] = useState<TaskMode>('pick')
   const [parsedResult, setParsedResult] = useState<ParsedVoiceResult | null>(null)
 
+  const [recentTask, setRecentTask] = useState<Task | null>(null)
+  const [recentTaskLoading, setRecentTaskLoading] = useState(false)
+  const [isMarkingComplete, setIsMarkingComplete] = useState(false)
+  const [isTaskEditOpen, setIsTaskEditOpen] = useState(false)
+
   // ── Step 1: Status state ─────────────────────────────────────────────────
   const [selectedStatus, setSelectedStatus] = useState<ProductivityStatus | null>(null)
   const [statusInputMode, setStatusInputMode] = useState<'idle' | 'voice' | 'text'>('idle')
@@ -132,6 +138,68 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
   const [showTaskPicker, setShowTaskPicker] = useState(false)
   const [availableTasks, setAvailableTasks] = useState<any[] | null>(null)
   
+  // ── Recent task support ─────────────────────────────────────────────────
+  useEffect(() => {
+    let mounted = true
+    setRecentTaskLoading(true)
+
+    ;(async () => {
+      try {
+        const tasks = await tasksApi.recent(1)
+        if (!mounted) return
+        if (tasks.length > 0) {
+          setRecentTask(tasks[0])
+        }
+      } catch {
+        // ignored
+      } finally {
+        if (mounted) setRecentTaskLoading(false)
+      }
+    })()
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const loadRecentTask = useCallback(async () => {
+    try {
+      setRecentTaskLoading(true)
+      const tasks = await tasksApi.recent(1)
+      setRecentTask(tasks.length > 0 ? tasks[0] : null)
+    } catch {
+      setRecentTask(null)
+    } finally {
+      setRecentTaskLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadRecentTask()
+  }, [loadRecentTask])
+
+  const handleUpdateRecentTask = () => {
+    if (!recentTask) return
+    setIsTaskEditOpen(true)
+  }
+
+  const handleMarkRecentTaskComplete = async () => {
+    if (!recentTask || isMarkingComplete) return
+    setIsMarkingComplete(true)
+    try {
+      await tasksApi.action(recentTask.id, {
+        action: 'done',
+        client_timestamp: new Date().toISOString(),
+        snooze_minutes: null,
+      })
+      setRecentTask(null)
+      toast.success('✅ Task marked as completed.')
+    } catch (err) {
+      toast.error(parseApiError(err))
+    } finally {
+      setIsMarkingComplete(false)
+    }
+  }
 
   // ── Step 2: Voice-task state ─────────────────────────────────────────────
   const [isParsingVoice, setIsParsingVoice] = useState(false)
@@ -443,6 +511,41 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
                               </p>
                             )}
                           </div>
+
+                          {recentTask && !recentTaskLoading && ['pending', 'in_progress'].includes(recentTask.status) && (
+                            <div className="rounded-2xl border border-border/60 bg-white/5 p-4 space-y-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-xs uppercase tracking-wider text-text-secondary font-semibold">
+                                    Recent Task
+                                  </p>
+                                  <p className="text-sm font-semibold text-text-primary mt-1">
+                                    {recentTask.title}
+                                  </p>
+                                </div>
+                                <div className="text-right text-[11px] text-text-muted">
+                                  <div>
+                                    {recentTask.status === 'in_progress' ? 'In Progress' : 'Pending'}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={handleMarkRecentTaskComplete}
+                                  className="btn-ghost flex-1 py-2 text-sm border border-border hover:bg-white/5"
+                                  disabled={isMarkingComplete}
+                                >
+                                  {isMarkingComplete ? 'Completing…' : 'Mark Complete'}
+                                </button>
+                                <button
+                                  onClick={handleUpdateRecentTask}
+                                  className="btn-primary flex-1 py-2 text-sm"
+                                >
+                                  Update
+                                </button>
+                              </div>
+                            </div>
+                          )}
 
                           {/* Recording status row */}
                           <div className="flex items-center gap-2 min-h-[18px]">
@@ -783,6 +886,16 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
             cancelSpeech()
             onClose()
           }}
+        />
+      )}
+      {recentTask && isTaskEditOpen && (
+        <TaskEditModal
+          open={isTaskEditOpen}
+          onClose={() => {
+            setIsTaskEditOpen(false)
+            loadRecentTask()
+          }}
+          task={recentTask}
         />
       )}
       {/* Task picker modal (renders on top when requested) */}

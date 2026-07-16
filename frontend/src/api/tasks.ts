@@ -11,6 +11,9 @@ export const tasksApi = {
   update: (id: string, data: TaskUpdateRequest) =>
     api.patch<Task>(`/tasks/${id}`, data).then((r) => r.data),
 
+  recent: (limit = 1) =>
+    api.get<Task[]>('/tasks/recent', { params: { limit } }).then((r) => r.data),
+
   delete: (id: string) => api.delete(`/tasks/${id}`),
 
   action: (id: string, data: TaskActionRequest) =>
