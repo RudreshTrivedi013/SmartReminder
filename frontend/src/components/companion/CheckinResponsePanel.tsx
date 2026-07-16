@@ -102,7 +102,7 @@ export function CheckinResponsePanel({ onClose }: CheckinResponsePanelProps) {
   const [hintIdx] = useState(() => Math.floor(Math.random() * VOICE_HINTS.length))
   const [showTaskPicker, setShowTaskPicker] = useState(false)
   const [availableTasks, setAvailableTasks] = useState<any[] | null>(null)
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  
 
   const effectiveTranscript = inputMode === 'voice' ? transcript.trim() : textInput.trim()
   const canSubmit = selectedStatus !== null && !isSubmitting && !isRecording
@@ -142,7 +142,7 @@ export function CheckinResponsePanel({ onClose }: CheckinResponsePanelProps) {
         end_at: now.toISOString(),
         transcript: effectiveTranscript || null,
         source: effectiveTranscript ? source : null,
-        task_id: selectedTaskId ?? undefined,
+        task_id: undefined,
       })
 
       const statusCfg = STATUS_OPTIONS.find((s) => s.value === selectedStatus)!
@@ -158,8 +158,57 @@ export function CheckinResponsePanel({ onClose }: CheckinResponsePanelProps) {
     }
   }, [selectedStatus, isSubmitting, inputMode, effectiveTranscript, onClose])
 
+  const submitWithTask = useCallback(async (taskId: string | number | null) => {
+    if (!selectedStatus || isSubmitting) return
+    const source = inputMode === 'voice' ? 'voice' : 'text'
+    const now = new Date()
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000)
+
+    setIsSubmitting(true)
+    try {
+      await companionApi.createCheckin({
+        status: selectedStatus,
+        start_at: oneHourAgo.toISOString(),
+        end_at: now.toISOString(),
+        transcript: effectiveTranscript || null,
+        source: effectiveTranscript ? source : null,
+        task_id: taskId ? String(taskId) : undefined,
+      })
+
+      const statusCfg = STATUS_OPTIONS.find((s) => s.value === selectedStatus)!
+      toast.success(`${statusCfg.emoji} Check-in saved — ${statusCfg.label}`)
+      setDone(true)
+
+      // Auto-close after a brief moment
+      setTimeout(() => onClose(), 1500)
+    } catch (err) {
+      toast.error(parseApiError(err))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [selectedStatus, isSubmitting, inputMode, effectiveTranscript, onClose])
+  // Task picker modal: fetch tasks when opened
+  useEffect(() => {
+    let mounted = true
+    if (!showTaskPicker) return
+    ;(async () => {
+      try {
+        const list = await tasksApi.list(0, 50)
+        if (!mounted) return
+        setAvailableTasks(list.filter((t: any) => !['done', 'blocked'].includes(t.status)))
+      } catch (err) {
+        toast.error('Failed to load tasks')
+        setAvailableTasks([])
+      }
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [showTaskPicker])
+
   return (
-    // Backdrop
+    <>
+    {/* Backdrop */}
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -367,72 +416,52 @@ export function CheckinResponsePanel({ onClose }: CheckinResponsePanelProps) {
         )}
       </motion.div>
     </motion.div>
+      {/* Task picker modal (rendered at top-level of this component) */}
+      {showTaskPicker && (
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60"
+            onClick={(e) => e.target === e.currentTarget && setShowTaskPicker(false)}
+          >
+            <motion.div className="glass-card w-full max-w-md p-4 border border-border">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold">Choose a task</h3>
+                <button onClick={() => setShowTaskPicker(false)} className="text-text-muted">Close</button>
+              </div>
+              <div className="space-y-2 max-h-72 overflow-auto">
+                {availableTasks === null ? (
+                  <p className="text-sm text-text-muted">Loading…</p>
+                ) : availableTasks.length === 0 ? (
+                  <p className="text-sm text-text-muted">No open tasks found.</p>
+                ) : (
+                  availableTasks.map((t: any) => (
+                    <button
+                      key={t.id}
+                        onClick={async () => {
+                          setShowTaskPicker(false)
+                          await submitWithTask(String(t.id))
+                        }}
+                      className="w-full text-left p-2 rounded hover:bg-white/5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-text-primary">{t.title}</div>
+                          <div className="text-xs text-text-muted">{t.status}</div>
+                        </div>
+                        <div className="text-xs text-text-muted">Select</div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>
+      )}
+    </>
   )
 }
 
-  // Task picker modal
-  useEffect(() => {
-    let mounted = true
-    if (!showTaskPicker) return
-    ;(async () => {
-      try {
-        const list = await tasksApi.list(0, 50)
-        if (!mounted) return
-        setAvailableTasks(list.filter((t: any) => !['done', 'blocked'].includes(t.status)))
-      } catch (err) {
-        toast.error('Failed to load tasks')
-        setAvailableTasks([])
-      }
-    })()
-    return () => {
-      mounted = false
-    }
-  }, [showTaskPicker])
-
-  // Render modal
-  if (showTaskPicker) {
-    return (
-      <AnimatePresence>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60"
-          onClick={(e) => e.target === e.currentTarget && setShowTaskPicker(false)}
-        >
-          <motion.div className="glass-card w-full max-w-md p-4 border border-border">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold">Choose a task</h3>
-              <button onClick={() => setShowTaskPicker(false)} className="text-text-muted">Close</button>
-            </div>
-            <div className="space-y-2 max-h-72 overflow-auto">
-              {availableTasks === null ? (
-                <p className="text-sm text-text-muted">Loading…</p>
-              ) : availableTasks.length === 0 ? (
-                <p className="text-sm text-text-muted">No open tasks found.</p>
-              ) : (
-                availableTasks.map((t: any) => (
-                  <button
-                    key={t.id}
-                    onClick={() => {
-                      setSelectedTaskId(String(t.id))
-                      setShowTaskPicker(false)
-                    }}
-                    className="w-full text-left p-2 rounded hover:bg-white/5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium text-text-primary">{t.title}</div>
-                        <div className="text-xs text-text-muted">{t.status}</div>
-                      </div>
-                      <div className="text-xs text-text-muted">Select</div>
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
-          </motion.div>
-        </motion.div>
-      </AnimatePresence>
-    )
-  }

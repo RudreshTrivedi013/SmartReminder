@@ -131,7 +131,7 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
   // Task selection state for attaching existing task
   const [showTaskPicker, setShowTaskPicker] = useState(false)
   const [availableTasks, setAvailableTasks] = useState<any[] | null>(null)
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  
 
   // ── Step 2: Voice-task state ─────────────────────────────────────────────
   const [isParsingVoice, setIsParsingVoice] = useState(false)
@@ -858,4 +858,4 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
         )}
       </div>
     )
-  }
+  }}
