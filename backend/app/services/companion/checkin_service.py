@@ -4,6 +4,7 @@ checkin_service.py — Core logic for Hourly Productivity Check-ins.
 import uuid
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
+import logging
 
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
@@ -20,6 +21,8 @@ from app.models.user import User
 
 _UTC = timezone.utc
 _SCHEDULER_WINDOW_MINUTES = 5
+
+logger = logging.getLogger(__name__)
 
 
 def _time_in_window(current, start, end) -> bool:
@@ -107,6 +110,7 @@ def create_pending_hourly_checkin(
         )
     ).scalar_one_or_none()
     if existing is not None:
+        logger.debug("[CheckinService] existing reminder %s for user %s at %s", getattr(existing, 'id', None), user.id, scheduled_time)
         return existing
 
     reminder = HourlyCheckinReminder(
@@ -116,6 +120,7 @@ def create_pending_hourly_checkin(
     )
     db.add(reminder)
     db.flush()
+    logger.debug("[CheckinService] created reminder %s for user %s at %s", getattr(reminder, 'id', None), user.id, scheduled_time)
     return reminder
 
 
@@ -135,6 +140,7 @@ def mark_expired_hourly_checkins_missed(db: Session, user: User, now_utc: dateti
     expired = 0
     for reminder in results.scalars().all():
         reminder.status = HourlyReminderStatus.missed
+        logger.debug("[CheckinService] marking reminder %s missed for user %s", getattr(reminder, 'id', None), user.id)
         expired += 1
     return expired
 
@@ -176,10 +182,12 @@ async def link_checkin_to_hourly_reminder(
         reminder = result.scalar_one_or_none()
 
     if reminder is None:
+        logger.debug("[CheckinService] no matching reminder found to link for user %s (reminder_id=%s)", user_id, reminder_id)
         return None
 
     reminder.status = HourlyReminderStatus.completed
     reminder.response_id = response_id
+    logger.debug("[CheckinService] linked response %s to reminder %s for user %s", response_id, getattr(reminder, 'id', None), user_id)
     await db.flush()
     return reminder
 

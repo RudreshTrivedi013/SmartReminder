@@ -51,13 +51,30 @@ def run_hourly_checkins():
                 is_working_hours = current_time >= user.working_hours_start or current_time < user.working_hours_end
 
             if is_working_hours:
-                checkin_service.mark_expired_hourly_checkins_missed(db, user, now_utc)
+                expired = checkin_service.mark_expired_hourly_checkins_missed(db, user, now_utc)
+                if expired:
+                    logger.debug("[Beat] Marked %d expired reminders missed for user %s", expired, user.id)
+                    try:
+                        db.commit()
+                    except Exception:
+                        logger.exception("[Beat] Failed to commit expired reminder updates for user %s", user.id)
+
                 if checkin_service.sync_needs_checkin(db, user, now_utc):
                     slot_start = checkin_service.slot_start_utc(user, now_utc)
+                    reminder = None
                     if slot_start is not None:
                         reminder = checkin_service.create_pending_hourly_checkin(db, user, slot_start)
+                        logger.info("[Beat] Created pending reminder %s for user %s at %s", getattr(reminder, 'id', None), user.id, slot_start)
+                        try:
+                            db.commit()
+                        except Exception:
+                            logger.exception("[Beat] Failed to commit created reminder for user %s", user.id)
+
                     logger.info("[Beat] Sending checkin to user %s (local hour=%d)", user.id, local_time.hour)
-                    _send_checkin_reminder(db, user, reminder)
+                    try:
+                        _send_checkin_reminder(db, user, reminder)
+                    except Exception:
+                        logger.exception("[Beat] _send_checkin_reminder failed for user %s", user.id)
                     triggered += 1
 @celery_app.task
 def send_delayed_checkin_reminder(user_id_str: str):
@@ -89,6 +106,10 @@ def _send_checkin_reminder(db, user: User, reminder: 'HourlyCheckinReminder | No
 
     if not devices:
         logger.debug("[Push] No devices found for user %s — skipping checkin push", user.id)
+        try:
+            db.commit()
+        except Exception:
+            logger.exception("[Push] Failed to commit db before skipping pushes for user %s", user.id)
         return
 
     payload = {

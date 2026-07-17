@@ -341,25 +341,32 @@ export function HourlyReminderPanel({ onClose, reminderId }: HourlyReminderPanel
     async (taskId: string | null = null) => {
       if (!pendingCheckin) return
       setIsSubmittingStatus(true)
-      try {
-        await companionApi.createCheckin({
-          status: pendingCheckin.status,
-          start_at: pendingCheckin.start_at,
-          end_at: pendingCheckin.end_at,
-          transcript: pendingCheckin.transcript ?? null,
-          source: pendingCheckin.source ?? null,
-          task_id: taskId ?? undefined,
-          reminder_id: reminderId ?? undefined,
-        } as any)
-        toast.success('✅ Check-in saved')
-        setPendingCheckin(null)
-        queryClient.invalidateQueries({ queryKey: CHECKIN_REMINDERS_KEY })
-        onClose()
-      } catch (err) {
-        toast.error(parseApiError(err))
-      } finally {
-        setIsSubmittingStatus(false)
-      }
+        try {
+          console.debug('[HourlyReminderPanel] submitting checkin', { pendingCheckin, taskId, reminderId })
+          await companionApi.createCheckin({
+            status: pendingCheckin.status,
+            start_at: pendingCheckin.start_at,
+            end_at: pendingCheckin.end_at,
+            transcript: pendingCheckin.transcript ?? null,
+            source: pendingCheckin.source ?? null,
+            task_id: taskId ?? undefined,
+            reminder_id: reminderId ?? undefined,
+          } as any)
+          toast.success('✅ Check-in saved')
+          setPendingCheckin(null)
+          // Invalidate all checkin reminder queries (including param variations)
+          try {
+            queryClient.invalidateQueries({ queryKey: CHECKIN_REMINDERS_KEY, exact: false })
+          } catch (iqErr) {
+            console.error('[HourlyReminderPanel] invalidateQueries failed', iqErr)
+          }
+          onClose()
+        } catch (err) {
+          console.error('[HourlyReminderPanel] submitPendingCheckin error', err)
+          toast.error(parseApiError(err))
+        } finally {
+          setIsSubmittingStatus(false)
+        }
     },
     [pendingCheckin, onClose, queryClient, reminderId]
   )
