@@ -190,7 +190,7 @@ async def create_checkin(
     )
     db.add(log)
 
-    if payload.reminder_id is not None:
+    try:
         await checkin_service.link_checkin_to_hourly_reminder(
             db=db,
             user_id=user.id,
@@ -198,13 +198,12 @@ async def create_checkin(
             response_id=log.id,
             reminder_id=payload.reminder_id,
         )
-    else:
-        await checkin_service.link_checkin_to_hourly_reminder(
-            db=db,
-            user_id=user.id,
-            start_at=start_at,
-            response_id=log.id,
-            reminder_id=None,
+    except Exception as link_err:
+        # Non-fatal: the reminder table may not exist yet or another transient
+        # error occurred.  The productivity log itself should still be saved.
+        logger.warning(
+            "[API] create_checkin: link_checkin_to_hourly_reminder failed (non-fatal): %s",
+            link_err,
         )
 
     await activity_service.record_activity(

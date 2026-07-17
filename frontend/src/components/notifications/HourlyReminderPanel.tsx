@@ -392,7 +392,7 @@ export function HourlyReminderPanel({ onClose, reminderId }: HourlyReminderPanel
     } finally {
       setIsCreatingTask(false)
     }
-  }, [taskTitle, taskDueAt, createTask, onClose])
+  }, [taskTitle, taskDueAt, createTask, submitPendingCheckin])
 
   // ── Render ────────────────────────────────────────────────────────────────
 

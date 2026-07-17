@@ -171,51 +171,55 @@ async def link_checkin_to_hourly_reminder(
     reminder_id: uuid.UUID | None = None,
 ) -> HourlyCheckinReminder | None:
     reminder = None
-    try:
-        if reminder_id is not None:
-            result = await db.execute(
-                select(HourlyCheckinReminder)
-                .where(
-                    HourlyCheckinReminder.user_id == user_id,
-                    HourlyCheckinReminder.id == reminder_id,
+    # Use a nested savepoint so any error here doesn't roll back the outer
+    # transaction (e.g. the ProductivityLog that was already added by the caller).
+    async with db.begin_nested() as savepoint:
+        try:
+            if reminder_id is not None:
+                result = await db.execute(
+                    select(HourlyCheckinReminder)
+                    .where(
+                        HourlyCheckinReminder.user_id == user_id,
+                        HourlyCheckinReminder.id == reminder_id,
+                    )
                 )
-            )
-            reminder = result.scalar_one_or_none()
+                reminder = result.scalar_one_or_none()
 
-        if reminder is None:
-            window_start = start_at - timedelta(minutes=5)
-            window_end = start_at + timedelta(minutes=5)
-            result = await db.execute(
-                select(HourlyCheckinReminder)
-                .where(
-                    HourlyCheckinReminder.user_id == user_id,
-                    HourlyCheckinReminder.status.in_([
-                        HourlyReminderStatus.pending,
-                        HourlyReminderStatus.missed,
-                    ]),
-                    HourlyCheckinReminder.scheduled_time >= window_start,
-                    HourlyCheckinReminder.scheduled_time <= window_end,
+            if reminder is None:
+                window_start = start_at - timedelta(minutes=5)
+                window_end = start_at + timedelta(minutes=5)
+                result = await db.execute(
+                    select(HourlyCheckinReminder)
+                    .where(
+                        HourlyCheckinReminder.user_id == user_id,
+                        HourlyCheckinReminder.status.in_([
+                            HourlyReminderStatus.pending,
+                            HourlyReminderStatus.missed,
+                        ]),
+                        HourlyCheckinReminder.scheduled_time >= window_start,
+                        HourlyCheckinReminder.scheduled_time <= window_end,
+                    )
+                    .order_by(HourlyCheckinReminder.scheduled_time.desc())
                 )
-                .order_by(HourlyCheckinReminder.scheduled_time.desc())
-            )
-            reminder = result.scalar_one_or_none()
+                reminder = result.scalar_one_or_none()
 
-        if reminder is None:
-            logger.debug("[CheckinService] no matching reminder found to link for user %s (reminder_id=%s)", user_id, reminder_id)
+            if reminder is None:
+                logger.debug("[CheckinService] no matching reminder found to link for user %s (reminder_id=%s)", user_id, reminder_id)
+                return None
+
+            reminder.status = HourlyReminderStatus.completed
+            reminder.response_id = response_id
+            logger.debug("[CheckinService] linked response %s to reminder %s for user %s", response_id, getattr(reminder, 'id', None), user_id)
+            await savepoint.commit()
+            return reminder
+        except ProgrammingError as exc:
+            logger.warning(
+                "[CheckinService] hourly_checkin_reminders table missing; cannot link check-in to reminder: %s",
+                exc,
+            )
+            await savepoint.rollback()
             return None
 
-        reminder.status = HourlyReminderStatus.completed
-        reminder.response_id = response_id
-        logger.debug("[CheckinService] linked response %s to reminder %s for user %s", response_id, getattr(reminder, 'id', None), user_id)
-        await db.flush()
-        return reminder
-    except ProgrammingError as exc:
-        logger.warning(
-            "[CheckinService] hourly_checkin_reminders table missing; cannot link check-in to reminder: %s",
-            exc,
-        )
-        await db.rollback()
-        return None
 
 
 async def log_productivity(
