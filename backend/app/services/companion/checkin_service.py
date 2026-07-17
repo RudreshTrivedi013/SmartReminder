@@ -130,6 +130,7 @@ def sync_needs_checkin(db: Session, user: User, now_utc: datetime) -> bool:
         logger.warning(
             "[CheckinService] sync_needs_checkin — could not query reminders table: %s", exc
         )
+        db.rollback()
 
     logger.debug(
         "[CheckinService] sync_needs_checkin — user %s needs checkin for slot %s",
@@ -176,7 +177,9 @@ def create_pending_hourly_checkin(
 
 def mark_expired_hourly_checkins_missed(db: Session, user: User, now_utc: datetime) -> int:
     interval_minutes = user.checkin_interval_minutes or 60
-    expired_threshold = now_utc - timedelta(minutes=interval_minutes)
+    # A checkin for slot X is generated at X + interval.
+    # It should expire at X + 2*interval (meaning the user ignored it for a full interval).
+    expired_threshold = now_utc - timedelta(minutes=interval_minutes * 2)
 
     try:
         results = db.execute(
