@@ -1,7 +1,11 @@
 import axios from 'axios'
 import { useAuthStore } from '@/stores/authStore'
 
-const API_URL = import.meta.env.VITE_API_URL as string ?? 'http://localhost:8000'
+const envApiUrl = import.meta.env.VITE_API_URL as string | undefined
+const fallbackApiUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
+const API_URL = envApiUrl || fallbackApiUrl
+
+console.debug('[API] configured baseURL:', API_URL)
 
 export const api = axios.create({
   baseURL: API_URL,

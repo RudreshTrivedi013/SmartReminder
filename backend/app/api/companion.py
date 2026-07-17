@@ -18,6 +18,7 @@ GET    /companion/productivity/summary   → aggregated stats for the last N day
 
 from datetime import datetime, timezone
 import json
+import logging
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -59,6 +60,7 @@ router = APIRouter(prefix="/companion", tags=["companion"])
 
 _UTC = timezone.utc
 
+logger = logging.getLogger(__name__)
 
 def _now() -> datetime:
     return datetime.now(_UTC)
@@ -145,7 +147,6 @@ async def create_checkin(
     user: User = Depends(get_current_user),
 ) -> ProductivityLogOut:
     submitted_at = _now()
-    logger = logging.getLogger(__name__)
     logger.debug("[API] create_checkin called user=%s payload=%s", user.id, {k: v for k, v in payload.__dict__.items()})
 
     # Validate task_id ownership when provided
