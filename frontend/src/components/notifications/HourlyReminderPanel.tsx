@@ -8,6 +8,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X,
@@ -27,13 +28,15 @@ import {
   SkipForward,
   PenLine,
 } from 'lucide-react'
+import { companionApi } from '@/api/companion'
+import type { HourlyCheckinReminder } from '@/types/companion'
 import toast from 'react-hot-toast'
 import { tasksApi } from '@/api/tasks'
 import { useVoiceInput } from '@/hooks/useVoiceInput'
-import { companionApi } from '@/api/companion'
 import { voiceApi } from '@/api/voice'
 import { useCreateTask } from '@/hooks/useTasks'
 import { parseApiError } from '@/lib/utils'
+import { CHECKIN_REMINDERS_KEY } from '@/hooks/useCheckinReminders'
 import type { ProductivityStatus } from '@/types/companion'
 import type { Task, ParsedVoiceResult } from '@/types/api'
 import { ParsedTaskPreview } from '@/components/voice/ParsedTaskPreview'
@@ -43,6 +46,7 @@ import { TaskEditModal } from '@/components/tasks/TaskEditModal'
 
 interface HourlyReminderPanelProps {
   onClose: () => void
+  reminderId?: string
 }
 
 type Step = 'status' | 'task'
@@ -109,7 +113,7 @@ function StepDots({ current }: { current: Step }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
+export function HourlyReminderPanel({ onClose, reminderId }: HourlyReminderPanelProps) {
   const [step, setStep] = useState<Step>('status')
   const [taskMode, setTaskMode] = useState<TaskMode>('pick')
   const [parsedResult, setParsedResult] = useState<ParsedVoiceResult | null>(null)
@@ -137,6 +141,8 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
   // Task selection state for attaching existing task
   const [showTaskPicker, setShowTaskPicker] = useState(false)
   const [availableTasks, setAvailableTasks] = useState<any[] | null>(null)
+  const [missedReminder, setMissedReminder] = useState<HourlyCheckinReminder | null>(null)
+  const [isLoadingReminder, setIsLoadingReminder] = useState(false)
   
   // ── Recent task support ─────────────────────────────────────────────────
   useEffect(() => {
@@ -178,6 +184,31 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
     loadRecentTask()
   }, [loadRecentTask])
 
+  useEffect(() => {
+    if (!reminderId) {
+      return
+    }
+
+    let mounted = true
+    setIsLoadingReminder(true)
+
+    ;(async () => {
+      try {
+        const reminder = await companionApi.getCheckinReminder(reminderId)
+        if (!mounted) return
+        setMissedReminder(reminder)
+      } catch {
+        // ignore failures, we still allow a normal checkin flow
+      } finally {
+        if (mounted) setIsLoadingReminder(false)
+      }
+    })()
+
+    return () => {
+      mounted = false
+    }
+  }, [reminderId])
+
   const handleUpdateRecentTask = () => {
     if (!recentTask) return
     setIsTaskEditOpen(true)
@@ -209,6 +240,7 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
   const [taskDueAt, setTaskDueAt] = useState('')
   const [isCreatingTask, setIsCreatingTask] = useState(false)
   const createTask = useCreateTask()
+  const queryClient = useQueryClient()
 
   // ── Voice input (shared) ─────────────────────────────────────────────────
   const {
@@ -223,6 +255,9 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
   } = useVoiceInput()
 
   const hintIdx = useRef(Math.floor(Math.random() * 4)).current
+  const reminderLabel = missedReminder
+    ? `Missed reminder from ${new Date(missedReminder.scheduled_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+    : 'Hourly Check-in'
   const VOICE_HINTS = [
     '"Worked on the API integration, pretty focused"',
     '"Got distracted by Slack messages"',
@@ -314,9 +349,11 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
           transcript: pendingCheckin.transcript ?? null,
           source: pendingCheckin.source ?? null,
           task_id: taskId ?? undefined,
+          reminder_id: reminderId ?? undefined,
         } as any)
         toast.success('✅ Check-in saved')
         setPendingCheckin(null)
+        queryClient.invalidateQueries({ queryKey: CHECKIN_REMINDERS_KEY })
         onClose()
       } catch (err) {
         toast.error(parseApiError(err))
@@ -324,7 +361,7 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
         setIsSubmittingStatus(false)
       }
     },
-    [pendingCheckin, onClose]
+    [pendingCheckin, onClose, queryClient, reminderId]
   )
 
   // ── Step 2: Create task via text form ─────────────────────────────────────
@@ -384,10 +421,14 @@ export function HourlyReminderPanel({ onClose }: HourlyReminderPanelProps) {
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-text-primary leading-tight">
-                    Hourly Check-in
+                    {reminderLabel}
                   </h2>
                   <p className="text-[11px] text-text-muted">
-                    {step === 'status' ? 'Step 1 of 2 — Status Update' : 'Step 2 of 2 — Create Task'}
+                    {isLoadingReminder
+                      ? 'Loading reminder…'
+                      : step === 'status'
+                      ? 'Step 1 of 2 — Status Update'
+                      : 'Step 2 of 2 — Create Task'}
                   </p>
                 </div>
               </div>

@@ -109,7 +109,10 @@ self.addEventListener('push', (event) => {
         ],
         requireInteraction: false,
         renotify: true,
-        data: { action_token: data.action_token },
+        data: {
+          action_token: data.action_token,
+          reminder_id: data.reminder_id,
+        },
       }
       event.waitUntil(
         self.registration.showNotification('Hourly Reminder', options)
@@ -190,7 +193,8 @@ self.addEventListener('notificationclick', (event) => {
         body: JSON.stringify({
           status: statusMap[event.action],
           start_at: new Date(Date.now() - 3600000).toISOString(),
-          end_at: new Date().toISOString()
+          end_at: new Date().toISOString(),
+          reminder_id: event.notification.data?.reminder_id,
         }),
       }).then(() => {
         // Broadcast to any open windows to refresh the UI
@@ -227,14 +231,17 @@ self.addEventListener('notificationclick', (event) => {
     // - For check-in notifications → open the app and signal voice check-in panel.
     // - For everything else → just focus/open the dashboard.
     const isCheckin = event.notification.tag === 'hourly-checkin'
-    const targetUrl = isCheckin ? '/dashboard?checkin=1' : '/dashboard'
+    const reminderId = event.notification.data?.reminder_id
+    const targetUrl = isCheckin
+      ? `/dashboard?checkin=1${reminderId ? `&reminderId=${reminderId}` : ''}`
+      : '/dashboard'
 
     event.waitUntil(
       clients.matchAll({ type: 'window' }).then((clientList) => {
         for (const client of clientList) {
           if (client.url.includes(self.location.origin) && 'focus' in client) {
             if (isCheckin) {
-              client.postMessage({ type: 'OPEN_CHECKIN_PANEL' })
+              client.postMessage({ type: 'OPEN_CHECKIN_PANEL', reminderId })
             }
             return client.focus().then((c) => c.navigate(targetUrl))
           }

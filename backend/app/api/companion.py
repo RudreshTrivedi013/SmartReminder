@@ -31,6 +31,7 @@ from app.models.activity import ActivitySource, ActivityType
 from app.models.companion import (
     ChatMessage,
     CurrentTask,
+    HourlyCheckinReminder,
     MessageRole,
     ProductivityLog,
     ProductivityStatus,
@@ -41,6 +42,7 @@ from app.schemas.companion import (
     ChatMessageOut,
     CurrentTaskOut,
     CurrentTaskSet,
+    HourlyCheckinReminderOut,
     ProductivityLogCreate,
     ProductivityLogOut,
 )
@@ -183,6 +185,24 @@ async def create_checkin(
         note=note,
     )
     db.add(log)
+
+    if payload.reminder_id is not None:
+        await checkin_service.link_checkin_to_hourly_reminder(
+            db=db,
+            user_id=user.id,
+            start_at=start_at,
+            response_id=log.id,
+            reminder_id=payload.reminder_id,
+        )
+    else:
+        await checkin_service.link_checkin_to_hourly_reminder(
+            db=db,
+            user_id=user.id,
+            start_at=start_at,
+            response_id=log.id,
+            reminder_id=None,
+        )
+
     await activity_service.record_activity(
         db,
         user_id=user.id,
@@ -203,6 +223,50 @@ async def create_checkin(
     await db.commit()
     await db.refresh(log)
     return ProductivityLogOut.model_validate(log)
+
+
+@router.get(
+    "/checkin/reminders",
+    response_model=list[HourlyCheckinReminderOut],
+    summary="List hourly check-in reminders",
+    description="Returns recent hourly reminders for the authenticated user, including pending, missed, and completed entries.",
+)
+async def get_checkin_reminders(
+    today: bool = Query(default=True),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[HourlyCheckinReminderOut]:
+    statement = select(HourlyCheckinReminder).where(HourlyCheckinReminder.user_id == user.id)
+
+    if today:
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        statement = statement.where(HourlyCheckinReminder.scheduled_time >= today_start)
+
+    statement = statement.order_by(HourlyCheckinReminder.scheduled_time.desc()).limit(limit)
+    result = await db.execute(statement)
+    return [HourlyCheckinReminderOut.model_validate(row) for row in result.scalars().all()]
+
+
+@router.get(
+    "/checkin/reminders/{reminder_id}",
+    response_model=HourlyCheckinReminderOut,
+    summary="Get a single hourly check-in reminder",
+    description="Returns a specific hourly reminder record by id.",
+)
+async def get_checkin_reminder(
+    reminder_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> HourlyCheckinReminderOut:
+    result = await db.execute(
+        select(HourlyCheckinReminder)
+        .where(HourlyCheckinReminder.id == reminder_id, HourlyCheckinReminder.user_id == user.id)
+    )
+    reminder = result.scalar_one_or_none()
+    if reminder is None:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    return HourlyCheckinReminderOut.model_validate(reminder)
 
 
 @router.get(

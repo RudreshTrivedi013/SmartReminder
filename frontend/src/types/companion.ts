@@ -5,6 +5,15 @@
 export type MessageRole = 'user' | 'assistant' | 'system';
 export type ProductivityStatus = 'focused' | 'distracted' | 'break' | 'idle';
 
+export interface HourlyCheckinReminder {
+  id: string;
+  user_id: string;
+  scheduled_time: string;
+  status: 'pending' | 'completed' | 'missed';
+  response_id: string | null;
+  created_at: string;
+}
+
 // --- Chat ---
 
 export interface ChatRequest {
@@ -31,6 +40,7 @@ export interface ChatHistoryResponse {
 
 export interface ProductivityLogCreate {
   task_id?: string | null;
+  reminder_id?: string | null;
   status: ProductivityStatus;
   start_at?: string | null;
   end_at?: string | null;

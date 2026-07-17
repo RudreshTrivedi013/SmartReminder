@@ -23,6 +23,7 @@ from app.models.companion import MessageRole, ProductivityStatus
 
 class ProductivityLogCreate(BaseModel):
     task_id: UUID | None = None
+    reminder_id: UUID | None = None
     status: ProductivityStatus = ProductivityStatus.idle
     start_at: datetime | None = None
     end_at: datetime | None = None
@@ -41,6 +42,17 @@ class ProductivityLogOut(BaseModel):
     end_at: datetime | None
     duration_seconds: int | None
     note: str | None
+
+    model_config = {"from_attributes": True}
+
+
+class HourlyCheckinReminderOut(BaseModel):
+    id: UUID
+    user_id: UUID
+    scheduled_time: datetime
+    status: Literal["pending", "completed", "missed"]
+    response_id: UUID | None
+    created_at: datetime
 
     model_config = {"from_attributes": True}
 

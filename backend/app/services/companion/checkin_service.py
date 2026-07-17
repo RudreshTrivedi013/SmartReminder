@@ -9,7 +9,13 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.companion import ProductivityLog, ProductivityStatus, CurrentTask
+from app.models.companion import (
+    ProductivityLog,
+    ProductivityStatus,
+    CurrentTask,
+    HourlyCheckinReminder,
+    HourlyReminderStatus,
+)
 from app.models.user import User
 
 _UTC = timezone.utc
@@ -28,7 +34,7 @@ def _minutes_since_midnight(value) -> int:
     return value.hour * 60 + value.minute
 
 
-def _slot_start_utc(user: User, now_utc: datetime) -> datetime | None:
+def slot_start_utc(user: User, now_utc: datetime) -> datetime | None:
     try:
         user_tz = ZoneInfo(user.timezone or "UTC")
     except Exception:
@@ -44,7 +50,6 @@ def _slot_start_utc(user: User, now_utc: datetime) -> datetime | None:
         return None
 
     interval_minutes = user.checkin_interval_minutes or 60
-    # interval_minutes = 1
     start_minutes = _minutes_since_midnight(user.working_hours_start)
     current_minutes = _minutes_since_midnight(current_time)
     work_start_local = local_now.replace(
@@ -75,7 +80,7 @@ def sync_needs_checkin(db: Session, user: User, now_utc: datetime) -> bool:
     if now_utc.tzinfo is None:
         now_utc = now_utc.replace(tzinfo=_UTC)
 
-    slot_start = _slot_start_utc(user, now_utc)
+    slot_start = slot_start_utc(user, now_utc)
     if slot_start is None:
         return False
     
@@ -87,6 +92,96 @@ def sync_needs_checkin(db: Session, user: User, now_utc: datetime) -> bool:
     count = result.scalar()
     
     return count == 0
+
+
+def create_pending_hourly_checkin(
+    db: Session,
+    user: User,
+    scheduled_time: datetime,
+) -> HourlyCheckinReminder | None:
+    existing = db.execute(
+        select(HourlyCheckinReminder)
+        .where(
+            HourlyCheckinReminder.user_id == user.id,
+            HourlyCheckinReminder.scheduled_time == scheduled_time,
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing
+
+    reminder = HourlyCheckinReminder(
+        user_id=user.id,
+        scheduled_time=scheduled_time,
+        status=HourlyReminderStatus.pending,
+    )
+    db.add(reminder)
+    db.flush()
+    return reminder
+
+
+def mark_expired_hourly_checkins_missed(db: Session, user: User, now_utc: datetime) -> int:
+    interval_minutes = user.checkin_interval_minutes or 60
+    expired_threshold = now_utc - timedelta(minutes=interval_minutes)
+
+    results = db.execute(
+        select(HourlyCheckinReminder)
+        .where(
+            HourlyCheckinReminder.user_id == user.id,
+            HourlyCheckinReminder.status == HourlyReminderStatus.pending,
+            HourlyCheckinReminder.scheduled_time <= expired_threshold,
+        )
+    )
+
+    expired = 0
+    for reminder in results.scalars().all():
+        reminder.status = HourlyReminderStatus.missed
+        expired += 1
+    return expired
+
+
+async def link_checkin_to_hourly_reminder(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    start_at: datetime,
+    response_id: uuid.UUID,
+    reminder_id: uuid.UUID | None = None,
+) -> HourlyCheckinReminder | None:
+    reminder = None
+    if reminder_id is not None:
+        result = await db.execute(
+            select(HourlyCheckinReminder)
+            .where(
+                HourlyCheckinReminder.user_id == user_id,
+                HourlyCheckinReminder.id == reminder_id,
+            )
+        )
+        reminder = result.scalar_one_or_none()
+
+    if reminder is None:
+        window_start = start_at - timedelta(minutes=5)
+        window_end = start_at + timedelta(minutes=5)
+        result = await db.execute(
+            select(HourlyCheckinReminder)
+            .where(
+                HourlyCheckinReminder.user_id == user_id,
+                HourlyCheckinReminder.status.in_([
+                    HourlyReminderStatus.pending,
+                    HourlyReminderStatus.missed,
+                ]),
+                HourlyCheckinReminder.scheduled_time >= window_start,
+                HourlyCheckinReminder.scheduled_time <= window_end,
+            )
+            .order_by(HourlyCheckinReminder.scheduled_time.desc())
+        )
+        reminder = result.scalar_one_or_none()
+
+    if reminder is None:
+        return None
+
+    reminder.status = HourlyReminderStatus.completed
+    reminder.response_id = response_id
+    await db.flush()
+    return reminder
 
 
 async def log_productivity(

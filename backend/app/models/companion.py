@@ -4,6 +4,7 @@ AI Productivity Companion models.
 Tables
 ------
 - productivity_logs  : Immutable log of productivity sessions / focus blocks.
+- hourly_checkin_reminders : Records every scheduled hourly reminder and its status.
 - current_task       : One-row-per-user view of what the user is working on right now.
 - chat_messages      : Chronological AI companion conversation history per user.
 """
@@ -103,6 +104,55 @@ class ProductivityLog(Base):
     )
     task: Mapped["Task | None"] = relationship(  # type: ignore[name-defined]  # noqa: F821
         "Task", foreign_keys=[task_id]
+    )
+
+
+class HourlyReminderStatus(str, enum.Enum):
+    pending = "pending"
+    completed = "completed"
+    missed = "missed"
+
+
+class HourlyCheckinReminder(Base):
+    __tablename__ = "hourly_checkin_reminders"
+    __table_args__ = (
+        Index("ix_hourly_checkin_reminders_user_id", "user_id"),
+        Index("ix_hourly_checkin_reminders_scheduled_time", "scheduled_time"),
+        Index("ix_hourly_checkin_reminders_user_scheduled_time", "user_id", "scheduled_time"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    scheduled_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    status: Mapped[HourlyReminderStatus] = mapped_column(
+        Enum(HourlyReminderStatus, name="hourly_checkin_reminder_status"),
+        nullable=False,
+        default=HourlyReminderStatus.pending,
+    )
+    response_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("productivity_logs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
+    response: Mapped["ProductivityLog | None"] = relationship(
+        "ProductivityLog",
+        foreign_keys=[response_id],
     )
 
 

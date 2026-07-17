@@ -24,6 +24,10 @@ if ('serviceWorker' in navigator) {
     if (event.data?.type === 'SUMMARY_READY' && event.data.summary) {
       useSummaryStore.getState().setPendingSummary(event.data.summary)
     }
+
+    if (event.data?.type === 'CHECKIN_LOGGED') {
+      queryClient.invalidateQueries({ queryKey: ['checkinReminders'] })
+    }
   })
 }
 

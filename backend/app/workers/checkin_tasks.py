@@ -51,14 +51,14 @@ def run_hourly_checkins():
                 is_working_hours = current_time >= user.working_hours_start or current_time < user.working_hours_end
 
             if is_working_hours:
+                checkin_service.mark_expired_hourly_checkins_missed(db, user, now_utc)
                 if checkin_service.sync_needs_checkin(db, user, now_utc):
+                    slot_start = checkin_service.slot_start_utc(user, now_utc)
+                    if slot_start is not None:
+                        reminder = checkin_service.create_pending_hourly_checkin(db, user, slot_start)
                     logger.info("[Beat] Sending checkin to user %s (local hour=%d)", user.id, local_time.hour)
-                    _send_checkin_reminder(db, user)
+                    _send_checkin_reminder(db, user, reminder)
                     triggered += 1
-
-        logger.info("[Beat] run_hourly_checkins — done. Triggered=%d", triggered)
-
-
 @celery_app.task
 def send_delayed_checkin_reminder(user_id_str: str):
     """
@@ -75,7 +75,7 @@ def send_delayed_checkin_reminder(user_id_str: str):
             logger.warning("[Task] send_delayed_checkin_reminder — user %s not found", user_id_str)
 
 
-def _send_checkin_reminder(db, user: User):
+def _send_checkin_reminder(db, user: User, reminder: 'HourlyCheckinReminder' | None = None):
     """
     Builds the payload and sends the push notification to all of the user's devices.
     """
@@ -97,6 +97,7 @@ def _send_checkin_reminder(db, user: User):
         "title": "Hourly Reminder",
         "body": "What are you working on right now?",
         "action_token": create_action_token(str(user.id)),
+        "reminder_id": str(reminder.id) if reminder is not None else None,
     }
 
     sent = 0

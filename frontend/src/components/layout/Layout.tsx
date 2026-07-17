@@ -22,22 +22,26 @@ export function Layout({ children }: LayoutProps) {
   const { deviceId } = useDeviceStore()
   const [searchParams, setSearchParams] = useSearchParams()
   const [isHourlyReminderOpen, setIsHourlyReminderOpen] = useState(false)
+  const [reminderId, setReminderId] = useState<string | undefined>(undefined)
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false)
 
   // Handle URL params for notification-driven panels.
   useEffect(() => {
     const shouldOpenCheckin = searchParams.get('checkin') === '1'
+    const newReminderId = searchParams.get('reminderId') ?? undefined
     const shouldOpenAddTask = searchParams.get('addTask') === '1'
 
-    if (shouldOpenCheckin) {
+    if (shouldOpenCheckin || newReminderId) {
+      setReminderId(newReminderId)
       setIsHourlyReminderOpen(true)
     }
     if (shouldOpenAddTask) {
       setIsCreateTaskOpen(true)
     }
-    if (shouldOpenCheckin || shouldOpenAddTask) {
+    if (shouldOpenCheckin || newReminderId || shouldOpenAddTask) {
       setSearchParams((prev) => {
         prev.delete('checkin')
+        prev.delete('reminderId')
         prev.delete('addTask')
         return prev
       }, { replace: true })
@@ -48,6 +52,7 @@ export function Layout({ children }: LayoutProps) {
   useEffect(() => {
     const handleSwMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === 'OPEN_CHECKIN_PANEL') {
+        setReminderId(event.data.reminderId ?? undefined)
         setIsHourlyReminderOpen(true)
       }
       if (event.data && event.data.type === 'OPEN_ADD_TASK_MODAL') {
@@ -106,7 +111,13 @@ export function Layout({ children }: LayoutProps) {
       {/* Global Modals/Overlays */}
       <AnimatePresence>
         {isHourlyReminderOpen && (
-          <HourlyReminderPanel onClose={() => setIsHourlyReminderOpen(false)} />
+          <HourlyReminderPanel
+            onClose={() => {
+              setIsHourlyReminderOpen(false)
+              setReminderId(undefined)
+            }}
+            reminderId={reminderId}
+          />
         )}
       </AnimatePresence>
       <TaskCreateModal open={isCreateTaskOpen} onClose={() => setIsCreateTaskOpen(false)} />

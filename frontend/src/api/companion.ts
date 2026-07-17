@@ -7,6 +7,7 @@ import {
   ChatRequest,
   CurrentTask,
   CurrentTaskSet,
+  HourlyCheckinReminder,
   ProductivityLog,
   ProductivityLogCreate,
   ProductivitySummary,
@@ -95,6 +96,17 @@ export const companionApi = {
    */
   async createCheckin(data: ProductivityLogCreate, signal?: AbortSignal): Promise<ProductivityLog> {
     return postRequest<ProductivityLog>('/companion/checkin', data, { signal });
+  },
+
+  async getCheckinReminders(today = true, limit = 50, signal?: AbortSignal): Promise<HourlyCheckinReminder[]> {
+    return getWithRetry<HourlyCheckinReminder[]>('/companion/checkin/reminders', {
+      params: { today, limit },
+      signal,
+    });
+  },
+
+  async getCheckinReminder(id: string, signal?: AbortSignal): Promise<HourlyCheckinReminder> {
+    return getWithRetry<HourlyCheckinReminder>(`/companion/checkin/reminders/${id}`, { signal });
   },
 
   /**
