@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 import logging
 
 from sqlalchemy import select, func
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -102,13 +103,22 @@ def create_pending_hourly_checkin(
     user: User,
     scheduled_time: datetime,
 ) -> HourlyCheckinReminder | None:
-    existing = db.execute(
-        select(HourlyCheckinReminder)
-        .where(
-            HourlyCheckinReminder.user_id == user.id,
-            HourlyCheckinReminder.scheduled_time == scheduled_time,
+    try:
+        existing = db.execute(
+            select(HourlyCheckinReminder)
+            .where(
+                HourlyCheckinReminder.user_id == user.id,
+                HourlyCheckinReminder.scheduled_time == scheduled_time,
+            )
+        ).scalar_one_or_none()
+    except ProgrammingError as exc:
+        logger.warning(
+            "[CheckinService] hourly_checkin_reminders table missing; skipping reminder creation and continuing: %s",
+            exc,
         )
-    ).scalar_one_or_none()
+        db.rollback()
+        return None
+
     if existing is not None:
         logger.debug("[CheckinService] existing reminder %s for user %s at %s", getattr(existing, 'id', None), user.id, scheduled_time)
         return existing
@@ -128,14 +138,22 @@ def mark_expired_hourly_checkins_missed(db: Session, user: User, now_utc: dateti
     interval_minutes = user.checkin_interval_minutes or 60
     expired_threshold = now_utc - timedelta(minutes=interval_minutes)
 
-    results = db.execute(
-        select(HourlyCheckinReminder)
-        .where(
-            HourlyCheckinReminder.user_id == user.id,
-            HourlyCheckinReminder.status == HourlyReminderStatus.pending,
-            HourlyCheckinReminder.scheduled_time <= expired_threshold,
+    try:
+        results = db.execute(
+            select(HourlyCheckinReminder)
+            .where(
+                HourlyCheckinReminder.user_id == user.id,
+                HourlyCheckinReminder.status == HourlyReminderStatus.pending,
+                HourlyCheckinReminder.scheduled_time <= expired_threshold,
+            )
         )
-    )
+    except ProgrammingError as exc:
+        logger.warning(
+            "[CheckinService] hourly_checkin_reminders table missing; skipping expired reminder processing: %s",
+            exc,
+        )
+        db.rollback()
+        return 0
 
     expired = 0
     for reminder in results.scalars().all():
