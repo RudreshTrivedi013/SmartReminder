@@ -23,6 +23,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user
@@ -247,7 +248,16 @@ async def get_checkin_reminders(
         statement = statement.where(HourlyCheckinReminder.scheduled_time >= today_start)
 
     statement = statement.order_by(HourlyCheckinReminder.scheduled_time.desc()).limit(limit)
-    result = await db.execute(statement)
+    try:
+        result = await db.execute(statement)
+    except ProgrammingError as exc:
+        logger.warning(
+            "[API] hourly_checkin_reminders table missing; returning empty reminders list: %s",
+            exc,
+        )
+        await db.rollback()
+        return []
+
     return [HourlyCheckinReminderOut.model_validate(row) for row in result.scalars().all()]
 
 
@@ -262,10 +272,20 @@ async def get_checkin_reminder(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> HourlyCheckinReminderOut:
-    result = await db.execute(
-        select(HourlyCheckinReminder)
-        .where(HourlyCheckinReminder.id == reminder_id, HourlyCheckinReminder.user_id == user.id)
-    )
+    try:
+        result = await db.execute(
+            select(HourlyCheckinReminder)
+            .where(HourlyCheckinReminder.id == reminder_id, HourlyCheckinReminder.user_id == user.id)
+        )
+    except ProgrammingError as exc:
+        logger.warning(
+            "[API] hourly_checkin_reminders table missing; cannot load reminder %s: %s",
+            reminder_id,
+            exc,
+        )
+        await db.rollback()
+        raise HTTPException(status_code=404, detail="Reminder not found")
+
     reminder = result.scalar_one_or_none()
     if reminder is None:
         raise HTTPException(status_code=404, detail="Reminder not found")
