@@ -75,7 +75,7 @@ def send_delayed_checkin_reminder(user_id_str: str):
             logger.warning("[Task] send_delayed_checkin_reminder — user %s not found", user_id_str)
 
 
-def _send_checkin_reminder(db, user: User, reminder: 'HourlyCheckinReminder' | None = None):
+def _send_checkin_reminder(db, user: User, reminder: 'HourlyCheckinReminder | None' = None):
     """
     Builds the payload and sends the push notification to all of the user's devices.
     """
