@@ -51,6 +51,7 @@ self.addEventListener('push', (event) => {
   if (!event.data) return
 
   try {
+    console.log('[SW] push received')
     const data = event.data.json()
 
     if (data.type === 'cancel') {
@@ -114,6 +115,7 @@ self.addEventListener('push', (event) => {
           reminder_id: data.reminder_id,
         },
       }
+      console.log('[SW] showing checkin notification', { reminder_id: data.reminder_id })
       event.waitUntil(
         self.registration.showNotification('Hourly Reminder', options)
       )
@@ -125,6 +127,7 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
+  console.log('[SW] notificationclick', { action: event.action, data: event.notification.data })
   const { task_id, action_token, summary, url } = event.notification.data || {}
 
   // If this is the summary notification, open the summary page.

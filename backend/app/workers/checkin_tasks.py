@@ -96,6 +96,10 @@ def _send_checkin_reminder(db, user: User, reminder: 'HourlyCheckinReminder | No
     """
     Builds the payload and sends the push notification to all of the user's devices.
     """
+    try:
+        logger.debug("[Push] _send_checkin_reminder invoked for user %s reminder=%s", user.id, getattr(reminder, 'id', None))
+    except Exception:
+        pass
     devices = db.execute(
         select(Device).where(
             Device.user_id == user.id,
@@ -128,7 +132,9 @@ def _send_checkin_reminder(db, user: User, reminder: 'HourlyCheckinReminder | No
             success = send_push(device.push_token, payload)
             if success:
                 sent += 1
-                logger.info("[Push] Checkin sent to device %s (user %s)", device.id, user.id)
+                logger.info("[Push] Checkin sent to device %s (user %s) reminder=%s", device.id, user.id, getattr(reminder, 'id', None))
+                # also log a Notification delivered marker for observability
+                logger.debug("[Push] Notification delivered to device %s (user %s) reminder=%s", device.id, user.id, getattr(reminder, 'id', None))
         except GoneException:
             logger.info("[Push] Device %s subscription gone — removing (user %s)", device.id, user.id)
             db.delete(device)

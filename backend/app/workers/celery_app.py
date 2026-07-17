@@ -34,6 +34,10 @@ celery_app.conf.update(
     enable_utc=True,
 )
 
+import logging
+_logger = logging.getLogger(__name__)
+_logger.info("[Scheduler] Celery beat configured with %d schedules", len(celery_app.conf.beat_schedule or {}))
+
 # Why server-driven scheduling (Celery, not client timers):
 # Client timers (setTimeout / JS intervals) die the moment a tab closes, a
 # phone sleeps, or the app is killed by the OS. A reminder app whose alarms
