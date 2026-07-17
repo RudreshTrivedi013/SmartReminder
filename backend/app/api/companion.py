@@ -232,11 +232,15 @@ async def create_checkin(
     "/checkin/reminders",
     response_model=list[HourlyCheckinReminderOut],
     summary="List hourly check-in reminders",
-    description="Returns recent hourly reminders for the authenticated user, including pending, missed, and completed entries.",
+    description=(
+        "Returns hourly reminders for the authenticated user. "
+        "Filter by `status` (pending | completed | missed) and/or `today=true` to restrict to today's records."
+    ),
 )
 async def get_checkin_reminders(
     today: bool = Query(default=True),
     limit: int = Query(default=50, ge=1, le=200),
+    status: str | None = Query(default=None, description="Filter by status: pending, completed, or missed"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[HourlyCheckinReminderOut]:
@@ -245,6 +249,14 @@ async def get_checkin_reminders(
     if today:
         today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         statement = statement.where(HourlyCheckinReminder.scheduled_time >= today_start)
+
+    if status is not None:
+        # Validate against known enum values to avoid SQLAlchemy cast errors
+        from app.models.companion import HourlyReminderStatus
+        valid_statuses = {s.value for s in HourlyReminderStatus}
+        if status not in valid_statuses:
+            raise HTTPException(status_code=422, detail=f"Invalid status '{status}'. Must be one of: {sorted(valid_statuses)}")
+        statement = statement.where(HourlyCheckinReminder.status == status)
 
     statement = statement.order_by(HourlyCheckinReminder.scheduled_time.desc()).limit(limit)
     try:

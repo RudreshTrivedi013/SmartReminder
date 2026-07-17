@@ -98,9 +98,13 @@ export const companionApi = {
     return postRequest<ProductivityLog>('/companion/checkin', data, { signal });
   },
 
-  async getCheckinReminders(today = true, limit = 50, signal?: AbortSignal): Promise<HourlyCheckinReminder[]> {
+  async getCheckinReminders(today = true, limit = 50, status?: string, signal?: AbortSignal): Promise<HourlyCheckinReminder[]> {
+    const params: Record<string, any> = { today, limit };
+    if (status) {
+      params.status = status;
+    }
     return getWithRetry<HourlyCheckinReminder[]>('/companion/checkin/reminders', {
-      params: { today, limit },
+      params,
       signal,
     });
   },

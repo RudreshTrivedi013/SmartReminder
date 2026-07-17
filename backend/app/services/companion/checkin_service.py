@@ -80,6 +80,12 @@ def slot_start_utc(user: User, now_utc: datetime) -> datetime | None:
 def sync_needs_checkin(db: Session, user: User, now_utc: datetime) -> bool:
     """
     Checks if a user needs a check-in reminder for the current scheduler window.
+
+    Returns False if:
+    - We're outside the slot window (slot_start is None).
+    - The user already submitted a ProductivityLog for this slot.
+    - A reminder record (pending OR completed) already exists for this slot,
+      preventing double-firing when the beat tick runs again within the same window.
     """
     if now_utc.tzinfo is None:
         now_utc = now_utc.replace(tzinfo=_UTC)
@@ -87,15 +93,49 @@ def sync_needs_checkin(db: Session, user: User, now_utc: datetime) -> bool:
     slot_start = slot_start_utc(user, now_utc)
     if slot_start is None:
         return False
-    
-    # Did the user log anything in the interval that just ended?
-    result = db.execute(
+
+    # Guard 1: Did the user already submit a productivity log for this slot?
+    log_count = db.execute(
         select(func.count())
         .where(ProductivityLog.user_id == user.id, ProductivityLog.start_at >= slot_start)
+    ).scalar()
+    if log_count and log_count > 0:
+        logger.debug(
+            "[CheckinService] sync_needs_checkin — user %s already has %d log(s) since slot %s",
+            user.id, log_count, slot_start,
+        )
+        return False
+
+    # Guard 2: Does a reminder record already exist for this slot?
+    # A 10-minute window around slot_start covers clock-skew between beat ticks.
+    window_end = slot_start + timedelta(minutes=10)
+    try:
+        reminder_count = db.execute(
+            select(func.count())
+            .where(
+                HourlyCheckinReminder.user_id == user.id,
+                HourlyCheckinReminder.scheduled_time >= slot_start,
+                HourlyCheckinReminder.scheduled_time < window_end,
+            )
+        ).scalar()
+        if reminder_count and reminder_count > 0:
+            logger.debug(
+                "[CheckinService] sync_needs_checkin — user %s already has a reminder for slot %s — skipping",
+                user.id, slot_start,
+            )
+            return False
+    except Exception as exc:
+        # If the reminders table is missing (e.g. migration pending), fall through
+        # and let the caller decide — the push can still go out reminder-less.
+        logger.warning(
+            "[CheckinService] sync_needs_checkin — could not query reminders table: %s", exc
+        )
+
+    logger.debug(
+        "[CheckinService] sync_needs_checkin — user %s needs checkin for slot %s",
+        user.id, slot_start,
     )
-    count = result.scalar()
-    
-    return count == 0
+    return True
 
 
 def create_pending_hourly_checkin(

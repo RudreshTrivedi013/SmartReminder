@@ -11,6 +11,8 @@ import { initServiceWorker } from '@/lib/sw-registration'
 import { HourlyReminderPanel } from '@/components/notifications/HourlyReminderPanel'
 import { TaskCreateModal } from '@/components/tasks/TaskCreateModal'
 
+import { useCheckinPanelStore } from '@/stores/checkinPanelStore'
+
 const PING_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
 
 interface LayoutProps {
@@ -21,8 +23,7 @@ export function Layout({ children }: LayoutProps) {
   useWebSocket()
   const { deviceId } = useDeviceStore()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [isHourlyReminderOpen, setIsHourlyReminderOpen] = useState(false)
-  const [reminderId, setReminderId] = useState<string | undefined>(undefined)
+  const { isOpen: isHourlyReminderOpen, reminderId, open: openCheckin, close: closeCheckin } = useCheckinPanelStore()
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false)
 
   // Handle URL params for notification-driven panels.
@@ -32,8 +33,7 @@ export function Layout({ children }: LayoutProps) {
     const shouldOpenAddTask = searchParams.get('addTask') === '1'
 
     if (shouldOpenCheckin || newReminderId) {
-      setReminderId(newReminderId)
-      setIsHourlyReminderOpen(true)
+      openCheckin(newReminderId)
     }
     if (shouldOpenAddTask) {
       setIsCreateTaskOpen(true)
@@ -52,8 +52,7 @@ export function Layout({ children }: LayoutProps) {
   useEffect(() => {
     const handleSwMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === 'OPEN_CHECKIN_PANEL') {
-        setReminderId(event.data.reminderId ?? undefined)
-        setIsHourlyReminderOpen(true)
+        openCheckin(event.data.reminderId ?? undefined)
       }
       if (event.data && event.data.type === 'OPEN_ADD_TASK_MODAL') {
         setIsCreateTaskOpen(true)
@@ -112,10 +111,7 @@ export function Layout({ children }: LayoutProps) {
       <AnimatePresence>
         {isHourlyReminderOpen && (
           <HourlyReminderPanel
-            onClose={() => {
-              setIsHourlyReminderOpen(false)
-              setReminderId(undefined)
-            }}
+            onClose={() => closeCheckin()}
             reminderId={reminderId}
           />
         )}
