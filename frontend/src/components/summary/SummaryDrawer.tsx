@@ -3,16 +3,11 @@ import { summaryApi } from '@/api/summary'
 import { parseApiError } from '@/lib/utils'
 import type { DaySummary } from '@/types/api'
 import toast from 'react-hot-toast'
-import {
-  Sparkles, Loader2, BarChart2, Zap, AlertTriangle, Lightbulb, Clock
-} from 'lucide-react'
+import { Sparkles, Loader2, BarChart2 } from 'lucide-react'
+import { SummaryCard } from './SummaryCard'
+import { format } from 'date-fns'
 
 interface SummaryDrawerProps {
-  /**
-   * Pre-filled summary received via push notification or WebSocket event.
-   * When provided the drawer renders the data immediately without needing
-   * the user to click "Generate Summary".
-   */
   initialSummary?: DaySummary | null
 }
 
@@ -35,12 +30,19 @@ export function SummaryDrawer({ initialSummary }: SummaryDrawerProps = {}) {
     }
   }
 
+  const now = new Date()
+  const dateLabel = format(now, 'EEEE, d MMMM')   // e.g. "Monday, 20 July"
+  const timeLabel = format(now, 'h:mm aa')          // e.g. "6:01 pm"
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Header row */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-bold text-text-primary tracking-tight">Day-End AI Summary</h2>
-          <p className="text-sm text-text-secondary">Get an encouraging structured review of today's progress.</p>
+          <h2 className="text-xl font-bold text-text-primary tracking-tight">Summary</h2>
+          <p className="text-sm text-text-secondary mt-0.5">
+            Streamlined format to highlight essentials concisely
+          </p>
         </div>
 
         <button
@@ -60,75 +62,57 @@ export function SummaryDrawer({ initialSummary }: SummaryDrawerProps = {}) {
         </button>
       </div>
 
+      {/* Generating skeleton */}
       {generating && (
-        <div className="glass-card p-12 text-center flex flex-col items-center justify-center space-y-4">
-          <Loader2 className="animate-spin h-10 w-10 text-primary" />
-          <h3 className="text-base font-semibold text-text-primary">Generating Summary</h3>
-          <p className="text-sm text-text-secondary max-w-sm">
-            Groq is analyzing your completed tasks, open deadlines, and today's activity log...
-          </p>
+        <div className="flex">
+          <div className="flex flex-col items-center mr-3 pt-1">
+            <div className="w-2.5 h-2.5 rounded-full bg-white/20 mt-1 animate-pulse" />
+            <div className="w-px flex-1 bg-white/[0.06] mt-2" />
+          </div>
+          <div className="flex-1 bg-[#111214] border border-white/[0.07] rounded-2xl px-5 py-4 space-y-3 mb-3 animate-pulse">
+            <div className="flex justify-between">
+              <div className="h-4 bg-white/10 rounded w-36" />
+              <div className="h-3 bg-white/5 rounded w-16" />
+            </div>
+            <div className="h-3 bg-white/5 rounded w-64" />
+            <div className="space-y-2 pt-1">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex items-center gap-2.5">
+                  <div className="w-3.5 h-3.5 rounded-full bg-white/10 shrink-0" />
+                  <div className="h-3 bg-white/5 rounded w-4/5" />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
+      {/* Empty state */}
       {!generating && !summary && (
-        <div className="glass-card p-12 text-center flex flex-col items-center justify-center space-y-4 border border-dashed border-border/50">
-          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-            <BarChart2 size={28} />
+        <div className="flex">
+          <div className="flex flex-col items-center mr-3 pt-1">
+            <div className="w-2.5 h-2.5 rounded-full bg-white/10 mt-1" />
           </div>
-          <h3 className="text-lg font-semibold text-text-primary">No summary generated yet</h3>
-          <p className="text-sm text-text-secondary max-w-sm">
-            Click the button above to analyze today's completion rates, snooze counters, and layout your plan for tomorrow.
-          </p>
+          <div className="flex-1 border border-dashed border-border/50 rounded-2xl p-8 flex flex-col items-center justify-center space-y-3 text-center mb-3">
+            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+              <BarChart2 size={22} />
+            </div>
+            <p className="text-sm text-text-secondary max-w-xs">
+              Click <strong className="text-text-primary">Generate Summary</strong> to get an AI-powered review of today's progress.
+            </p>
+          </div>
         </div>
       )}
 
+      {/* Summary card */}
       {summary && !generating && (
-        <div className="space-y-6 animate-fade-in">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Overview */}
-            <div className="glass-card p-5 space-y-2 border-t-2 border-t-primary">
-              <div className="flex items-center gap-2 text-primary">
-                <BarChart2 size={18} />
-                <h3 className="font-bold text-sm tracking-wide uppercase">Today's Overview</h3>
-              </div>
-              <p className="text-sm text-text-secondary leading-relaxed">{summary.summary}</p>
-            </div>
-
-            {/* Highlight */}
-            <div className="glass-card p-5 space-y-2 border-t-2 border-t-success">
-              <div className="flex items-center gap-2 text-success">
-                <Zap size={18} />
-                <h3 className="font-bold text-sm tracking-wide uppercase">⭐ Highlight</h3>
-              </div>
-              <p className="text-sm text-text-secondary leading-relaxed">{summary.highlight}</p>
-            </div>
-
-            {/* Concerns */}
-            <div className="glass-card p-5 space-y-2 border-t-2 border-t-warning bg-warning/[0.01]">
-              <div className="flex items-center gap-2 text-warning">
-                <AlertTriangle size={18} />
-                <h3 className="font-bold text-sm tracking-wide uppercase">⚠️ Concern</h3>
-              </div>
-              <p className="text-sm text-text-secondary leading-relaxed">{summary.concern}</p>
-            </div>
-
-            {/* Tomorrow's Suggestion */}
-            <div className="glass-card p-5 space-y-2 border-t-2 border-t-accent">
-              <div className="flex items-center gap-2 text-accent">
-                <Lightbulb size={18} />
-                <h3 className="font-bold text-sm tracking-wide uppercase">🌅 Tomorrow's Plan</h3>
-              </div>
-              <p className="text-sm text-text-secondary leading-relaxed">{summary.tomorrow_suggestion}</p>
-            </div>
-          </div>
-
-          {generatedAt && (
-            <div className="flex items-center justify-end gap-1.5 text-xs text-text-muted select-none font-mono">
-              <Clock size={12} />
-              Generated today at {generatedAt.toLocaleTimeString()}
-            </div>
-          )}
-        </div>
+        <SummaryCard
+          date={generatedAt ? format(generatedAt, 'EEEE, d MMMM') : dateLabel}
+          time={generatedAt ? format(generatedAt, 'h:mm aa') : timeLabel}
+          subtitle={summary.summary}
+          summary={summary}
+          isActive
+        />
       )}
     </div>
   )

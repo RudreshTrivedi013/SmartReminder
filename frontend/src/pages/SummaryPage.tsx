@@ -6,19 +6,9 @@ export default function SummaryPage() {
   const { pendingSummary } = useSummaryStore()
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 px-1 sm:px-0">
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-text-primary">Summary</h1>
-        <p className="text-sm text-text-secondary mt-1">
-          Review your day and prepare for tomorrow.
-        </p>
-      </div>
+    <div className="max-w-2xl mx-auto space-y-1 px-1 sm:px-0">
       <SummaryDrawer initialSummary={pendingSummary} />
-      
-      {/* Separator / History Section */}
-      <div className="pt-8 mt-8 border-t border-border/50">
-        <SummaryHistory />
-      </div>
+      <SummaryHistory />
     </div>
   )
 }
