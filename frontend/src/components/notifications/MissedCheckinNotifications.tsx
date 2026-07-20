@@ -5,12 +5,25 @@ import { useCheckinPanelStore } from '@/stores/checkinPanelStore'
 import { isToday, isYesterday, format } from 'date-fns'
 
 export function MissedCheckinNotifications() {
-  const { data: reminders = [], isLoading } = useCheckinReminders(false, 50, 'missed')
+  // Fetch all reminders (no status filter) so we catch overdue 'pending' ones
+  // that the backend worker hasn't processed yet, as well as genuine 'missed' ones.
+  const { data: reminders = [], isLoading } = useCheckinReminders(false, 50, undefined)
   const { open } = useCheckinPanelStore()
   const [isExpanded, setIsExpanded] = useState(true)
 
   const missed = useMemo(
-    () => reminders.filter((reminder) => reminder.status === 'missed'),
+    () => {
+      const now = new Date() // recalculated fresh on every reminders refetch
+      return reminders.filter((reminder) => {
+        if (reminder.status === 'missed') return true
+        // Treat overdue pending reminders as missed (worker may not have run yet)
+        if (reminder.status === 'pending') {
+          const scheduledAt = new Date(reminder.scheduled_time)
+          return scheduledAt < now
+        }
+        return false
+      })
+    },
     [reminders]
   )
 
