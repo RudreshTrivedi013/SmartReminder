@@ -32,6 +32,7 @@ import { companionApi } from '@/api/companion'
 import { tasksApi } from '@/api/tasks'
 import { parseApiError } from '@/lib/utils'
 import type { ProductivityStatus } from '@/types/companion'
+import { useCheckinPanelStore } from '@/stores/checkinPanelStore'
 
 // ── Status quick-pick config ─────────────────────────────────────────────────
 
@@ -103,6 +104,8 @@ export function CheckinResponsePanel({ onClose }: CheckinResponsePanelProps) {
   const [showTaskPicker, setShowTaskPicker] = useState(false)
   const [availableTasks, setAvailableTasks] = useState<any[] | null>(null)
   
+  const { reminderId } = useCheckinPanelStore()
+  
 
   const effectiveTranscript = inputMode === 'voice' ? transcript.trim() : textInput.trim()
   const canSubmit = selectedStatus !== null && !isSubmitting && !isRecording
@@ -138,11 +141,12 @@ export function CheckinResponsePanel({ onClose }: CheckinResponsePanelProps) {
     try {
       await companionApi.createCheckin({
         status: selectedStatus,
-        start_at: oneHourAgo.toISOString(),
-        end_at: now.toISOString(),
+        start_at: reminderId ? undefined : oneHourAgo.toISOString(),
+        end_at: reminderId ? undefined : now.toISOString(),
         transcript: effectiveTranscript || null,
         source: effectiveTranscript ? source : null,
         task_id: undefined,
+        reminder_id: reminderId,
       })
 
       const statusCfg = STATUS_OPTIONS.find((s) => s.value === selectedStatus)!
@@ -168,11 +172,12 @@ export function CheckinResponsePanel({ onClose }: CheckinResponsePanelProps) {
     try {
       await companionApi.createCheckin({
         status: selectedStatus,
-        start_at: oneHourAgo.toISOString(),
-        end_at: now.toISOString(),
+        start_at: reminderId ? undefined : oneHourAgo.toISOString(),
+        end_at: reminderId ? undefined : now.toISOString(),
         transcript: effectiveTranscript || null,
         source: effectiveTranscript ? source : null,
         task_id: taskId ? String(taskId) : undefined,
+        reminder_id: reminderId,
       })
 
       const statusCfg = STATUS_OPTIONS.find((s) => s.value === selectedStatus)!

@@ -16,7 +16,7 @@ POST   /companion/current-task           → set / update focus-mode state
 GET    /companion/productivity/summary   → aggregated stats for the last N days
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import json
 import logging
 from uuid import UUID, uuid4
@@ -168,6 +168,25 @@ async def create_checkin(
         delta = payload.end_at - start_at
         duration = max(0, int(delta.total_seconds()))
 
+    activity_timestamp = submitted_at
+
+    if payload.reminder_id is not None:
+        reminder_result = await db.execute(
+            select(HourlyCheckinReminder).where(
+                HourlyCheckinReminder.id == payload.reminder_id,
+                HourlyCheckinReminder.user_id == user.id
+            )
+        )
+        reminder = reminder_result.scalar_one_or_none()
+        if reminder:
+            activity_timestamp = reminder.scheduled_time
+            if not payload.start_at:
+                start_at = reminder.scheduled_time - timedelta(hours=1)
+            if not payload.end_at:
+                payload.end_at = reminder.scheduled_time
+                if duration is None:
+                    duration = 3600 # default 1 hour if not provided
+
     note = payload.note
     if payload.transcript is not None:
         note = json.dumps(
@@ -215,7 +234,7 @@ async def create_checkin(
         task_title=task_for_activity.title if task_for_activity else "Hourly check-in",
         optional_notes=payload.transcript or payload.note,
         source=ActivitySource.checkin,
-        timestamp=submitted_at,
+        timestamp=activity_timestamp,
         metadata={
             "event": "hourly_checkin",
             "status": payload.status.value,
