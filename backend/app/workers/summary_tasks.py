@@ -17,8 +17,10 @@ import logging
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 
 from app.models import User, Task, TaskStatus, TaskSource, Device
+from app.models.companion import DailySummary
 from app.services import push_service, summary_service
 from app.workers.celery_app import celery_app
 
@@ -81,6 +83,21 @@ def _run_for_user_sync(db: Session, user: User):
     try:
         # summary_service.generate_day_end_summary is async — run it in its own loop
         result = asyncio.run(summary_service.generate_day_end_summary(stats))
+        
+        # Save / Upsert to the DB
+        tz = ZoneInfo(user.timezone or "UTC")
+        local_date = datetime.now(timezone.utc).astimezone(tz).date()
+        
+        stmt = insert(DailySummary).values(
+            user_id=user.id,
+            date=local_date,
+            content=result,
+        ).on_conflict_do_update(
+            constraint="uq_daily_summary_user_date",
+            set_={"content": result, "created_at": datetime.now(timezone.utc)},
+        )
+        db.execute(stmt)
+        db.commit()
     except Exception as exc:
         logger.error("Summary generation failed for user %s: %s", user.id, exc)
         return

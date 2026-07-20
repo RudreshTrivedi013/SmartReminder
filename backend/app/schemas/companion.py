@@ -7,7 +7,7 @@ Follows the same pattern as app/schemas/task.py:
   - *Update        → PATCH bodies (all fields optional)
 """
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import Literal
 from uuid import UUID
 
@@ -113,3 +113,24 @@ class ChatHistoryOut(BaseModel):
 
     messages: list[ChatMessageOut]
     total: int
+
+
+# ---------------------------------------------------------------------------
+# DailySummary
+# ---------------------------------------------------------------------------
+
+
+class DailySummaryOut(BaseModel):
+    id: UUID
+    user_id: UUID
+    date: date
+    content: dict
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class SummaryHistoryOut(BaseModel):
+    summaries: list[DailySummaryOut]
+    total: int
+

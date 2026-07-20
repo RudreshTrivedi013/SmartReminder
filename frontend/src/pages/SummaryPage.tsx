@@ -1,5 +1,6 @@
 import { useSummaryStore } from '@/stores/summaryStore'
 import { SummaryDrawer } from '@/components/summary/SummaryDrawer'
+import { SummaryHistory } from '@/components/summary/SummaryHistory'
 
 export default function SummaryPage() {
   const { pendingSummary } = useSummaryStore()
@@ -13,6 +14,11 @@ export default function SummaryPage() {
         </p>
       </div>
       <SummaryDrawer initialSummary={pendingSummary} />
+      
+      {/* Separator / History Section */}
+      <div className="pt-8 mt-8 border-t border-border/50">
+        <SummaryHistory />
+      </div>
     </div>
   )
 }

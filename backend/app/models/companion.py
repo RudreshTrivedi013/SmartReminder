@@ -13,8 +13,8 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String, DateTime, ForeignKey, Integer, Enum, Index, Text, Boolean
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import String, DateTime, ForeignKey, Integer, Enum, Index, Text, Boolean, Date, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -270,3 +270,38 @@ class ChatMessage(Base):
     task: Mapped["Task | None"] = relationship(  # type: ignore[name-defined]  # noqa: F821
         "Task", foreign_keys=[task_id]
     )
+
+
+# ---------------------------------------------------------------------------
+# DailySummary
+# ---------------------------------------------------------------------------
+
+
+class DailySummary(Base):
+    """
+    Persistent record of a user's day-end AI summary.
+    """
+
+    __tablename__ = "daily_summaries"
+    __table_args__ = (
+        UniqueConstraint("user_id", "date", name="uq_daily_summary_user_date"),
+        Index("ix_daily_summaries_user_date_desc", "user_id", "date", postgresql_ops={"date": "DESC"}),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    date: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    content: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
+

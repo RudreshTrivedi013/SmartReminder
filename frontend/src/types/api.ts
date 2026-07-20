@@ -186,3 +186,16 @@ export interface ActivityListParams {
   activity_type?: ActivityType
   source?: ActivitySource
 }
+
+export interface DailySummaryOut {
+  id: string
+  user_id: string
+  date: string
+  content: DaySummary
+  created_at: string
+}
+
+export interface SummaryHistoryOut {
+  summaries: DailySummaryOut[]
+  total: number
+}
