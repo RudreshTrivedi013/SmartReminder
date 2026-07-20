@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
+import { useAuth } from '@/hooks/useAuth'
 import { devicesApi } from '@/api/devices'
 import { authApi } from '@/api/auth'
 import type { Device } from '@/types/api'
@@ -16,11 +18,15 @@ import {
   Clock,
   ToggleLeft,
   ToggleRight,
-  Bell
+  Bell,
+  LogOut
 } from 'lucide-react'
 
 export default function SettingsPage() {
   const { user, setUser } = useAuthStore()
+  const { logout } = useAuth()
+  const navigate = useNavigate()
+  
   const [devices, setDevices] = useState<Device[]>([])
   const [loadingDevices, setLoadingDevices] = useState(false)
   const [pinging, setPinging] = useState<string | null>(null)
@@ -126,6 +132,11 @@ export default function SettingsPage() {
     } finally {
       setTestingPush(false)
     }
+  }
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
   }
 
   return (
@@ -355,6 +366,18 @@ export default function SettingsPage() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Account Actions (Visible mostly for mobile) */}
+      <div className="md:hidden glass-card p-4 sm:p-5 space-y-4">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-danger">Account Actions</h2>
+        <button 
+          onClick={handleLogout} 
+          className="w-full btn-ghost py-2.5 px-4 text-sm bg-danger/10 text-danger hover:bg-danger/20 border border-danger/20 flex items-center justify-center gap-2"
+        >
+          <LogOut size={18} />
+          Sign out
+        </button>
       </div>
     </div>
   )
