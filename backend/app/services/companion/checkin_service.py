@@ -18,6 +18,7 @@ from app.models.companion import (
     HourlyCheckinReminder,
     HourlyReminderStatus,
 )
+from app.models.activity import ReminderActivity, ActivityType, ActivitySource
 from app.models.user import User
 
 _UTC = timezone.utc
@@ -201,8 +202,24 @@ def mark_expired_hourly_checkins_missed(db: Session, user: User, now_utc: dateti
     expired = 0
     for reminder in results.scalars().all():
         reminder.status = HourlyReminderStatus.missed
+        
+        # Log missed checkin as an activity in the timeline
+        activity = ReminderActivity(
+            user_id=user.id,
+            activity_type=ActivityType.hourly_checkin,
+            task_title="Missed Check-in",
+            source=ActivitySource.checkin,
+            timestamp=now_utc,
+            metadata_json={"status": "missed"}
+        )
+        db.add(activity)
+
         logger.debug("[CheckinService] marking reminder %s missed for user %s", getattr(reminder, 'id', None), user.id)
         expired += 1
+        
+    if expired > 0:
+        db.flush()
+        
     return expired
 
 

@@ -5,7 +5,6 @@ import { TaskList } from '@/components/tasks/TaskList'
 import { TaskCreateModal } from '@/components/tasks/TaskCreateModal'
 import { CompanionCommandBar } from '@/components/companion/CompanionCommandBar'
 import { TodayTimeline } from '@/components/activity/TodayTimeline'
-import { MissedCheckinNotifications } from '@/components/notifications/MissedCheckinNotifications'
 import { Plus, CheckCircle2, Clock, Sparkles } from 'lucide-react'
 import type { Task } from '@/types/api'
 
@@ -67,10 +66,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Task List */}
       <div className="space-y-6">
         <CompanionCommandBar />
-        <MissedCheckinNotifications />
         <TodayTimeline />
         
         {isLoading ? (

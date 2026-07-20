@@ -63,6 +63,13 @@ function displayMeta(activity: ReminderActivity) {
       tone: 'text-warning bg-warning/10 border-warning/20',
     }
   }
+  if (status === 'missed') {
+    return {
+      label: 'Missed',
+      icon: Clock3,
+      tone: 'text-text-muted bg-white/5 border-white/10',
+    }
+  }
 
   return ACTIVITY_META.hourly_checkin
 }
