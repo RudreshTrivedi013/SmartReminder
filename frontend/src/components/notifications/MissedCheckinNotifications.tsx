@@ -9,7 +9,7 @@ export function MissedCheckinNotifications() {
   // that the backend worker hasn't processed yet, as well as genuine 'missed' ones.
   const { data: reminders = [], isLoading } = useCheckinReminders(false, 50, undefined)
   const { open } = useCheckinPanelStore()
-  const [isExpanded, setIsExpanded] = useState(true)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   const missed = useMemo(
     () => {
