@@ -14,15 +14,20 @@ export function MissedCheckinNotifications() {
   const missed = useMemo(
     () => {
       const now = new Date() // recalculated fresh on every reminders refetch
-      return reminders.filter((reminder) => {
+      console.log('[MissedCheckin] total reminders from API:', reminders.length, reminders)
+      const result = reminders.filter((reminder) => {
         if (reminder.status === 'missed') return true
         // Treat overdue pending reminders as missed (worker may not have run yet)
         if (reminder.status === 'pending') {
           const scheduledAt = new Date(reminder.scheduled_time)
-          return scheduledAt < now
+          const isOverdue = scheduledAt < now
+          console.log('[MissedCheckin] pending reminder:', reminder.scheduled_time, '→ scheduledAt:', scheduledAt, 'now:', now, 'isOverdue:', isOverdue)
+          return isOverdue
         }
         return false
       })
+      console.log('[MissedCheckin] missed count:', result.length)
+      return result
     },
     [reminders]
   )
