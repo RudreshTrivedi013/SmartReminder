@@ -13,7 +13,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.models.companion import MessageRole, ProductivityStatus
+from app.models.companion import MessageRole, ProductivityStatus, HourlyReminderStatus
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +50,7 @@ class HourlyCheckinReminderOut(BaseModel):
     id: UUID
     user_id: UUID
     scheduled_time: datetime
-    status: Literal["pending", "completed", "missed"]
+    status: HourlyReminderStatus
     response_id: UUID | None
     created_at: datetime
 

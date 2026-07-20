@@ -261,6 +261,8 @@ async def get_checkin_reminders(
     statement = statement.order_by(HourlyCheckinReminder.scheduled_time.desc()).limit(limit)
     try:
         result = await db.execute(statement)
+        rows = result.scalars().all()
+        return [HourlyCheckinReminderOut.model_validate(row) for row in rows]
     except ProgrammingError as exc:
         logger.warning(
             "[API] hourly_checkin_reminders table missing; returning empty reminders list: %s",
@@ -268,8 +270,13 @@ async def get_checkin_reminders(
         )
         await db.rollback()
         return []
-
-    return [HourlyCheckinReminderOut.model_validate(row) for row in result.scalars().all()]
+    except Exception as exc:
+        logger.exception(
+            "[API] get_checkin_reminders unexpected error (today=%s status=%s): %s",
+            today, status, exc,
+        )
+        await db.rollback()
+        return []
 
 
 @router.get(
