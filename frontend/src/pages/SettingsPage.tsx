@@ -41,7 +41,8 @@ const CHECKIN_PRESETS = [
 ] as const
 
 const INTERVAL_OPTIONS = [
-  { value: 30,  label: 'Every 30 minutes' },
+  { value: 5,   label: 'Every 5 min' },
+  { value: 30,  label: 'Every 30 min' },
   { value: 60,  label: 'Every 1 hour' },
   { value: 120, label: 'Every 2 hours' },
 ] as const
@@ -318,7 +319,7 @@ export default function SettingsPage() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-text-secondary mb-2">
                 Check-in Interval
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {INTERVAL_OPTIONS.map((opt) => {
                   const isActive = settings.checkin_interval_minutes === opt.value
                   return (
