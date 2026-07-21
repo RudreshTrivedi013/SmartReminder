@@ -64,12 +64,24 @@ self.addEventListener('push', (event) => {
       return
     }
 
+    if (data.type === 'test') {
+      event.waitUntil(
+        self.registration.showNotification(data.title || 'SmartReminder Test 🔔', {
+          body: data.body || 'Push notifications are working correctly!',
+          tag: data.tag || 'test-push',
+          icon: '/favicon.svg',
+          badge: '/favicon.svg',
+          requireInteraction: false,
+        })
+      )
+    }
+
     if (data.type === 'reminder') {
       const options = {
         body: `Due: ${new Date(data.due_at).toLocaleTimeString()}`,
         tag: data.tag,
-        icon: '/vite.svg',
-        badge: '/vite.svg',
+        icon: '/favicon.svg',
+        badge: '/favicon.svg',
         actions: [
           { action: 'done', title: '✓ Done' },
           { action: 'snooze', title: '⏰ Snooze 10m' },
@@ -87,8 +99,8 @@ self.addEventListener('push', (event) => {
       const options = {
         body: data.body,
         tag: data.tag,
-        icon: '/vite.svg',
-        badge: '/vite.svg',
+        icon: '/favicon.svg',
+        badge: '/favicon.svg',
         requireInteraction: false,
         data: { summary: data.summary, url: '/summary' },
       }
@@ -101,8 +113,8 @@ self.addEventListener('push', (event) => {
       const options = {
         body: 'What are you working on right now?',
         tag: data.tag,
-        icon: '/vite.svg',
-        badge: '/vite.svg',
+        icon: '/favicon.svg',
+        badge: '/favicon.svg',
         actions: [
           { action: 'productive', title: 'Productive' },
           { action: 'not_productive', title: 'Not productive' },
