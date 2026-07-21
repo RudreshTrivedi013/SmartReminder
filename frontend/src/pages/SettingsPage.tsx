@@ -8,6 +8,46 @@ import type { Device } from '@/types/api'
 import { registerPushSubscription } from '@/lib/sw-registration'
 import { parseApiError } from '@/lib/utils'
 import toast from 'react-hot-toast'
+
+// ── Check-in preset modes ────────────────────────────────────────────────────
+const CHECKIN_PRESETS = [
+  {
+    id: 'light',
+    label: 'Light',
+    emoji: '🌅',
+    description: 'Relaxed workday',
+    hours: '9 AM – 5 PM',
+    interval: 'Every 2 hours',
+    working_hours_start: '09:00:00',
+    working_hours_end: '17:00:00',
+    checkin_interval_minutes: 120,
+    checksPerDay: '4 check-ins / day',
+  },
+  {
+    id: 'focused',
+    label: 'Focused',
+    emoji: '⚡',
+    description: 'Standard office day',
+    hours: '9 AM – 6 PM',
+    interval: 'Every 1 hour',
+    working_hours_start: '09:00:00',
+    working_hours_end: '18:00:00',
+    checkin_interval_minutes: 60,
+    checksPerDay: '9 check-ins / day',
+  },
+  {
+    id: 'intense',
+    label: 'Intense',
+    emoji: '🔥',
+    description: 'Deep work sessions',
+    hours: '8 AM – 9 PM',
+    interval: 'Every 30 min',
+    working_hours_start: '08:00:00',
+    working_hours_end: '21:00:00',
+    checkin_interval_minutes: 30,
+    checksPerDay: '26 check-ins / day',
+  },
+] as const
 import {
   Laptop,
   Globe,
@@ -212,45 +252,82 @@ export default function SettingsPage() {
         </div>
 
         {settings.checkin_enabled && (
-          <div className="pt-4 border-t border-border/30 space-y-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
-              <Clock size={12} /> Check-in Schedule
-            </h3>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">Working Hours Start</label>
-                <input
-                  type="time"
-                  value={settings.working_hours_start.slice(0, 5)}
-                  onChange={(e) => handleSettingChange('working_hours_start', e.target.value + ':00')}
-                  className="input-field w-full text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">Working Hours End</label>
-                <input
-                  type="time"
-                  value={settings.working_hours_end.slice(0, 5)}
-                  onChange={(e) => handleSettingChange('working_hours_end', e.target.value + ':00')}
-                  className="input-field w-full text-sm"
-                />
-              </div>
+          <div className="pt-4 border-t border-border/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+                <Clock size={12} /> Check-in Schedule
+              </h3>
+              {/* Show Custom badge if saved settings don't match any preset */}
+              {!CHECKIN_PRESETS.some(
+                p =>
+                  p.working_hours_start === settings.working_hours_start &&
+                  p.working_hours_end === settings.working_hours_end &&
+                  p.checkin_interval_minutes === settings.checkin_interval_minutes
+              ) && (
+                <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-warning/10 border border-warning/20 text-warning">
+                  Custom
+                </span>
+              )}
             </div>
-            
-            <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1">Check-in Interval</label>
-              <select
-                value={settings.checkin_interval_minutes}
-                onChange={(e) => handleSettingChange('checkin_interval_minutes', parseInt(e.target.value))}
-                className="input-field w-full text-sm"
-              >
-                <option value={5}>Every 5 minutes</option>
-                <option value={30}>Every 30 minutes</option>
-                <option value={60}>Every 1 hour</option>
-                <option value={90}>Every 1.5 hours</option>
-                <option value={120}>Every 2 hours</option>
-              </select>
+
+            <div className="grid grid-cols-3 gap-2">
+              {CHECKIN_PRESETS.map((preset) => {
+                const isActive =
+                  settings.working_hours_start === preset.working_hours_start &&
+                  settings.working_hours_end === preset.working_hours_end &&
+                  settings.checkin_interval_minutes === preset.checkin_interval_minutes
+
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => {
+                      handleSettingChange('working_hours_start', preset.working_hours_start)
+                      handleSettingChange('working_hours_end', preset.working_hours_end)
+                      handleSettingChange('checkin_interval_minutes', preset.checkin_interval_minutes)
+                    }}
+                    className={[
+                      'relative flex flex-col items-start gap-1.5 rounded-xl border p-3 text-left transition-all duration-200',
+                      isActive
+                        ? 'border-primary bg-primary/10 shadow-[0_0_0_1px] shadow-primary/30'
+                        : 'border-border/40 bg-white/[0.02] hover:border-primary/40 hover:bg-white/5',
+                    ].join(' ')}
+                  >
+                    {/* Active dot */}
+                    {isActive && (
+                      <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                    )}
+
+                    <span className="text-xl leading-none">{preset.emoji}</span>
+
+                    <div>
+                      <p className={`text-sm font-semibold ${isActive ? 'text-primary' : 'text-text-primary'}`}>
+                        {preset.label}
+                      </p>
+                      <p className="text-[10px] text-text-muted leading-tight mt-0.5">
+                        {preset.description}
+                      </p>
+                    </div>
+
+                    <div className="space-y-0.5 mt-0.5">
+                      <p className="text-[10px] text-text-secondary">
+                        🕐 {preset.hours}
+                      </p>
+                      <p className="text-[10px] text-text-secondary">
+                        🔔 {preset.interval}
+                      </p>
+                    </div>
+
+                    <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded mt-0.5 ${
+                      isActive
+                        ? 'bg-primary/20 text-primary'
+                        : 'bg-white/5 text-text-muted'
+                    }`}>
+                      {preset.checksPerDay}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         )}
