@@ -22,7 +22,7 @@ from app.models.activity import ReminderActivity, ActivityType, ActivitySource
 from app.models.user import User
 
 _UTC = timezone.utc
-_SCHEDULER_WINDOW_MINUTES = 5
+_SCHEDULER_WINDOW_MINUTES = 2
 
 logger = logging.getLogger(__name__)
 

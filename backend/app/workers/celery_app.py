@@ -47,7 +47,7 @@ _logger.info("[Scheduler] Celery beat configured with %d schedules", len(celery_
 # source of truth for "what time is it / what's due", which also sidesteps
 # clock-skew bugs across devices.
 
-checkin_schedule = 300.0
+checkin_schedule = 60.0
 # checkin_schedule = 10.0
 celery_app.conf.beat_schedule = {
     "check-due-reminders-every-60s": {
