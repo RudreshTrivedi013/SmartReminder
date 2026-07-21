@@ -9,44 +9,41 @@ import { registerPushSubscription } from '@/lib/sw-registration'
 import { parseApiError } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
-// ── Check-in preset modes ────────────────────────────────────────────────────
+// ── Working-hours time slot presets (interval is chosen separately) ──────────
 const CHECKIN_PRESETS = [
   {
-    id: 'light',
-    label: 'Light',
+    id: 'short',
+    label: 'Short',
     emoji: '🌅',
-    description: 'Relaxed workday',
+    description: 'Light workday',
     hours: '9 AM – 5 PM',
-    interval: 'Every 2 hours',
     working_hours_start: '09:00:00',
     working_hours_end: '17:00:00',
-    checkin_interval_minutes: 120,
-    checksPerDay: '4 check-ins / day',
   },
   {
-    id: 'focused',
-    label: 'Focused',
+    id: 'standard',
+    label: 'Standard',
     emoji: '⚡',
-    description: 'Standard office day',
-    hours: '9 AM – 6 PM',
-    interval: 'Every 1 hour',
+    description: 'Typical office day',
+    hours: '9 AM – 7 PM',
     working_hours_start: '09:00:00',
-    working_hours_end: '18:00:00',
-    checkin_interval_minutes: 60,
-    checksPerDay: '9 check-ins / day',
+    working_hours_end: '19:00:00',
   },
   {
-    id: 'intense',
-    label: 'Intense',
+    id: 'long',
+    label: 'Long',
     emoji: '🔥',
-    description: 'Deep work sessions',
+    description: 'Extended work session',
     hours: '8 AM – 9 PM',
-    interval: 'Every 30 min',
     working_hours_start: '08:00:00',
     working_hours_end: '21:00:00',
-    checkin_interval_minutes: 30,
-    checksPerDay: '26 check-ins / day',
   },
+] as const
+
+const INTERVAL_OPTIONS = [
+  { value: 30,  label: 'Every 30 minutes' },
+  { value: 60,  label: 'Every 1 hour' },
+  { value: 120, label: 'Every 2 hours' },
 ] as const
 import {
   Laptop,
@@ -252,83 +249,97 @@ export default function SettingsPage() {
         </div>
 
         {settings.checkin_enabled && (
-          <div className="pt-4 border-t border-border/30 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
-                <Clock size={12} /> Check-in Schedule
-              </h3>
-              {/* Show Custom badge if saved settings don't match any preset */}
-              {!CHECKIN_PRESETS.some(
-                p =>
-                  p.working_hours_start === settings.working_hours_start &&
-                  p.working_hours_end === settings.working_hours_end &&
-                  p.checkin_interval_minutes === settings.checkin_interval_minutes
-              ) && (
-                <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-warning/10 border border-warning/20 text-warning">
-                  Custom
-                </span>
-              )}
-            </div>
+          <div className="pt-4 border-t border-border/30 space-y-4">
 
-            <div className="grid grid-cols-3 gap-2">
-              {CHECKIN_PRESETS.map((preset) => {
-                const isActive =
-                  settings.working_hours_start === preset.working_hours_start &&
-                  settings.working_hours_end === preset.working_hours_end &&
-                  settings.checkin_interval_minutes === preset.checkin_interval_minutes
+            {/* ── Working Hours slot presets ──────────────────────── */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+                  <Clock size={12} /> Working Hours
+                </label>
+                {!CHECKIN_PRESETS.some(
+                  p =>
+                    p.working_hours_start === settings.working_hours_start &&
+                    p.working_hours_end === settings.working_hours_end
+                ) && (
+                  <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-warning/10 border border-warning/20 text-warning">
+                    Custom
+                  </span>
+                )}
+              </div>
 
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => {
-                      handleSettingChange('working_hours_start', preset.working_hours_start)
-                      handleSettingChange('working_hours_end', preset.working_hours_end)
-                      handleSettingChange('checkin_interval_minutes', preset.checkin_interval_minutes)
-                    }}
-                    className={[
-                      'relative flex flex-col items-start gap-1.5 rounded-xl border p-3 text-left transition-all duration-200',
-                      isActive
-                        ? 'border-primary bg-primary/10 shadow-[0_0_0_1px] shadow-primary/30'
-                        : 'border-border/40 bg-white/[0.02] hover:border-primary/40 hover:bg-white/5',
-                    ].join(' ')}
-                  >
-                    {/* Active dot */}
-                    {isActive && (
-                      <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                    )}
+              <div className="grid grid-cols-3 gap-2">
+                {CHECKIN_PRESETS.map((preset) => {
+                  const isActive =
+                    settings.working_hours_start === preset.working_hours_start &&
+                    settings.working_hours_end === preset.working_hours_end
 
-                    <span className="text-xl leading-none">{preset.emoji}</span>
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        handleSettingChange('working_hours_start', preset.working_hours_start)
+                        handleSettingChange('working_hours_end', preset.working_hours_end)
+                      }}
+                      className={[
+                        'relative flex flex-col items-start gap-1.5 rounded-xl border p-3 text-left transition-all duration-200',
+                        isActive
+                          ? 'border-primary bg-primary/10 shadow-[0_0_0_1px] shadow-primary/30'
+                          : 'border-border/40 bg-white/[0.02] hover:border-primary/40 hover:bg-white/5',
+                      ].join(' ')}
+                    >
+                      {isActive && (
+                        <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                      )}
 
-                    <div>
-                      <p className={`text-sm font-semibold ${isActive ? 'text-primary' : 'text-text-primary'}`}>
-                        {preset.label}
-                      </p>
-                      <p className="text-[10px] text-text-muted leading-tight mt-0.5">
-                        {preset.description}
-                      </p>
-                    </div>
+                      <span className="text-xl leading-none">{preset.emoji}</span>
 
-                    <div className="space-y-0.5 mt-0.5">
-                      <p className="text-[10px] text-text-secondary">
+                      <div>
+                        <p className={`text-sm font-semibold ${isActive ? 'text-primary' : 'text-text-primary'}`}>
+                          {preset.label}
+                        </p>
+                        <p className="text-[10px] text-text-muted leading-tight mt-0.5">
+                          {preset.description}
+                        </p>
+                      </div>
+
+                      <p className={`text-[10px] font-medium mt-0.5 ${ isActive ? 'text-primary/80' : 'text-text-secondary'}`}>
                         🕐 {preset.hours}
                       </p>
-                      <p className="text-[10px] text-text-secondary">
-                        🔔 {preset.interval}
-                      </p>
-                    </div>
-
-                    <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded mt-0.5 ${
-                      isActive
-                        ? 'bg-primary/20 text-primary'
-                        : 'bg-white/5 text-text-muted'
-                    }`}>
-                      {preset.checksPerDay}
-                    </span>
-                  </button>
-                )
-              })}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
+
+            {/* ── Check-in Interval dropdown ──────────────────────── */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-text-secondary mb-2">
+                Check-in Interval
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {INTERVAL_OPTIONS.map((opt) => {
+                  const isActive = settings.checkin_interval_minutes === opt.value
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => handleSettingChange('checkin_interval_minutes', opt.value)}
+                      className={[
+                        'rounded-xl border py-2.5 px-3 text-xs font-medium transition-all duration-200 text-center',
+                        isActive
+                          ? 'border-primary bg-primary/10 text-primary shadow-[0_0_0_1px] shadow-primary/30'
+                          : 'border-border/40 bg-white/[0.02] text-text-secondary hover:border-primary/40 hover:bg-white/5',
+                      ].join(' ')}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
           </div>
         )}
         
