@@ -42,7 +42,13 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
 
-    if (error.response?.status !== 401 || originalRequest._retry) {
+    // Don't intercept refresh calls themselves (would cause an infinite loop)
+    // or requests that have already been retried once.
+    if (
+      error.response?.status !== 401 ||
+      originalRequest._retry ||
+      (originalRequest.url as string | undefined)?.includes('/auth/refresh')
+    ) {
       return Promise.reject(error)
     }
 
@@ -59,7 +65,9 @@ api.interceptors.response.use(
         failedQueue.push({ resolve, reject })
       })
         .then((token) => {
+          originalRequest.headers = originalRequest.headers ?? {}
           originalRequest.headers.Authorization = `Bearer ${token}`
+          originalRequest._retry = true
           return api(originalRequest)
         })
         .catch((err) => Promise.reject(err))
