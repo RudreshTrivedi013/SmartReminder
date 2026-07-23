@@ -21,8 +21,58 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// --- Refresh token queue to prevent parallel refresh storms ---
-let isRefreshing = false
+// --- Shared single-flight refresh lock ---
+// Both the 401 interceptor and the proactive useTokenRefresh hook call
+// refreshAccessToken(). A single in-flight promise ensures only one
+// /auth/refresh request is active at a time — the second caller simply
+// awaits the same promise, preventing refresh-token-rotation from
+// blocklisting a token that is still in use by a parallel request.
+let refreshPromise: Promise<string> | null = null
+
+/**
+ * Refresh the access token using the refresh token stored in localStorage.
+ * Returns the new access token, or throws if the refresh fails.
+ *
+ * Safe to call from multiple places concurrently — only one network request
+ * will be made; all callers share the same in-flight promise.
+ */
+export async function refreshAccessToken(): Promise<string> {
+  // If a refresh is already in flight, piggyback on it.
+  if (refreshPromise) return refreshPromise
+
+  const refreshToken = localStorage.getItem('refresh_token')
+  if (!refreshToken) {
+    throw new Error('No refresh token available')
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const { data } = await axios.post(`${API_URL}/auth/refresh`, {
+        refresh_token: refreshToken,
+      })
+      const newAccessToken: string = data.access_token
+      const newRefreshToken: string = data.refresh_token
+
+      useAuthStore.getState().setAccessToken(newAccessToken)
+      if (newRefreshToken) {
+        localStorage.setItem('refresh_token', newRefreshToken)
+      }
+      api.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`
+      console.debug('[Auth] Token refreshed proactively/reactively')
+      return newAccessToken
+    } catch (err) {
+      // Clear auth only if the refresh itself failed (not a network blip
+      // that the caller can retry).
+      throw err
+    } finally {
+      refreshPromise = null
+    }
+  })()
+
+  return refreshPromise
+}
+
+// --- Queued requests waiting for a refresh ---
 let failedQueue: Array<{ resolve: (value: string) => void; reject: (reason?: unknown) => void }> = []
 
 const processQueue = (error: unknown, token: string | null = null) => {
@@ -59,11 +109,10 @@ api.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    if (isRefreshing) {
-      // Queue this request while a refresh is already in flight
-      return new Promise<string>((resolve, reject) => {
-        failedQueue.push({ resolve, reject })
-      })
+    // If a refresh is already in flight (from the proactive hook or another
+    // 401), queue this request to be retried once the refresh completes.
+    if (refreshPromise) {
+      return refreshPromise
         .then((token) => {
           originalRequest.headers = originalRequest.headers ?? {}
           originalRequest.headers.Authorization = `Bearer ${token}`
@@ -74,19 +123,9 @@ api.interceptors.response.use(
     }
 
     originalRequest._retry = true
-    isRefreshing = true
 
     try {
-      const { data } = await axios.post(`${API_URL}/auth/refresh`, {
-        refresh_token: refreshToken,
-      })
-      const newAccessToken: string = data.access_token
-      const newRefreshToken: string = data.refresh_token
-      useAuthStore.getState().setAccessToken(newAccessToken)
-      if (newRefreshToken) {
-        localStorage.setItem('refresh_token', newRefreshToken)
-      }
-      api.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`
+      const newAccessToken = await refreshAccessToken()
       processQueue(null, newAccessToken)
       originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
       return api(originalRequest)
@@ -95,8 +134,6 @@ api.interceptors.response.use(
       useAuthStore.getState().clearAuth()
       window.location.href = '/login'
       return Promise.reject(refreshError)
-    } finally {
-      isRefreshing = false
     }
   },
 )

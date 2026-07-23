@@ -8,6 +8,7 @@ import VoicePage from '@/pages/VoicePage'
 import SummaryPage from '@/pages/SummaryPage'
 import SettingsPage from '@/pages/SettingsPage'
 import { useAuthStore } from '@/stores/authStore'
+import { useTokenRefresh } from '@/hooks/useTokenRefresh'
 
 interface ProtectedRouteProps {
   children: React.ReactElement
@@ -15,6 +16,11 @@ interface ProtectedRouteProps {
 
 function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated } = useAuthStore()
+
+  // Proactively refresh the access token before it expires so the user is
+  // never silently logged out when the tab is inactive.
+  useTokenRefresh()
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
