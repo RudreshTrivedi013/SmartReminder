@@ -13,10 +13,17 @@ export const api = axios.create({
 })
 
 // --- Request interceptor: attach Bearer token ---
+// Skip public auth endpoints — login/signup don't need a token, and attaching
+// a stale one causes the 401 interceptor to fire a spurious refresh cycle.
+const PUBLIC_AUTH_PATHS = ['/auth/login', '/auth/signup', '/auth/refresh']
 api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().accessToken
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  const url = config.url ?? ''
+  const isPublic = PUBLIC_AUTH_PATHS.some((path) => url.includes(path))
+  if (!isPublic) {
+    const token = useAuthStore.getState().accessToken
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
   }
   return config
 })

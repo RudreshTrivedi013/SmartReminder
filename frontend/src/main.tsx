@@ -4,7 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 import App from './App'
-import { idbGetToken, useAuthStore } from './stores/authStore'
+import { idbGetToken, idbClearToken, useAuthStore } from './stores/authStore'
 import { useSummaryStore } from './stores/summaryStore'
 import { authApi } from './api/auth'
 import './index.css'
@@ -37,12 +37,17 @@ async function initApp() {
   if (token) {
     try {
       useAuthStore.getState().setAccessToken(token)
-      // Attempt to fetch user to fully hydrate auth state. If this fails, the Axios
-      // interceptor will handle the 401 and try to refresh the token.
+      // Attempt to fetch user to fully hydrate auth state.
       const user = await authApi.me()
       useAuthStore.getState().setAuth(token, user)
     } catch {
-      // Axios interceptor will catch 401s and attempt refresh
+      // Token is expired or invalid — wipe ALL stale state so the user
+      // lands on a clean login/signup page without a corrupted auth context.
+      // This prevents the Axios interceptor from attaching a bad token to
+      // login/signup requests and triggering a false "Network Error".
+      localStorage.removeItem('refresh_token')
+      await idbClearToken()
+      useAuthStore.getState().clearAuth()
     }
   }
 

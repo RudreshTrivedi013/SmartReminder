@@ -7,6 +7,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { parseApiError, TIMEZONES } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { Loader2, Mail, Lock, Globe } from 'lucide-react'
+import { idbClearToken } from '@/stores/authStore'
 
 const signupSchema = zod.object({
   email: zod.string().email('Please enter a valid email address'),
@@ -42,6 +43,21 @@ export function SignupForm() {
       toast.error(parseApiError(err))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const resetAppData = async () => {
+    try {
+      localStorage.clear()
+      await idbClearToken()
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(regs.map((r) => r.unregister()))
+      }
+      toast.success('App data cleared — please try again.')
+      window.location.reload()
+    } catch {
+      toast.error('Could not reset app data.')
     }
   }
 
@@ -118,6 +134,17 @@ export function SignupForm() {
         <Link to="/login" className="text-primary hover:underline font-medium">
           Log in
         </Link>
+      </p>
+
+      <p className="text-center text-xs text-text-muted mt-2">
+        Having trouble?{' '}
+        <button
+          type="button"
+          onClick={resetAppData}
+          className="underline hover:text-text-secondary transition-colors"
+        >
+          Reset app data
+        </button>
       </p>
     </div>
   )
