@@ -51,7 +51,8 @@ async def refresh_token(
     if block_val:
         try:
             # Check if it was blocklisted within the last 60 seconds (grace period)
-            block_time = float(block_val.decode('utf-8'))
+            block_time_str = block_val.decode('utf-8') if isinstance(block_val, bytes) else str(block_val)
+            block_time = float(block_time_str)
             now = datetime.now(timezone.utc).timestamp()
             if now - block_time > 60:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token has been revoked")
