@@ -53,11 +53,15 @@ async function initApp() {
             const newAccess = await refreshAccessToken()
             const user = await authApi.me()
             useAuthStore.getState().setAuth(newAccess, user)
-          } catch {
-            // Refresh token is also invalid/expired — truly logged out.
-            localStorage.removeItem('refresh_token')
-            await idbClearToken()
-            useAuthStore.getState().clearAuth()
+          } catch (err) {
+            const refreshStatus = (err as any)?.response?.status
+            // Only clear auth on definitive rejection (4xx), not network errors
+            if (refreshStatus >= 400 && refreshStatus < 500) {
+              // Refresh token is also invalid/expired — truly logged out.
+              localStorage.removeItem('refresh_token')
+              await idbClearToken()
+              useAuthStore.getState().clearAuth()
+            }
           }
         } else {
           // No refresh token stored — clean up the stale access token.

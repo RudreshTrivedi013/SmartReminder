@@ -138,8 +138,13 @@ api.interceptors.response.use(
       return api(originalRequest)
     } catch (refreshError) {
       processQueue(refreshError, null)
-      useAuthStore.getState().clearAuth()
-      window.location.href = '/login'
+      // Only force logout if the server definitively rejected the refresh
+      // token (401/403) or request (400). Don't log out on network errors.
+      const status = (refreshError as any)?.response?.status
+      if (status >= 400 && status < 500) {
+        useAuthStore.getState().clearAuth()
+        window.location.href = '/login'
+      }
       return Promise.reject(refreshError)
     }
   },
