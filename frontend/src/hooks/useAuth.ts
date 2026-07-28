@@ -13,10 +13,12 @@ export function useAuth() {
 
   const login = async (email: string, password: string) => {
     const tokens = await authApi.login({ email, password })
+    // Fetch the user profile with the newly-issued token *before* writing
+    // anything to the store.  This avoids a race where a stale access token
+    // still in the store would cause the 401 interceptor to fire during me(),
+    // consume the (possibly blocklisted) old refresh token, and redirect to /login.
+    const user = await authApi.meWithToken(tokens.access_token)
     localStorage.setItem('refresh_token', tokens.refresh_token)
-    useAuthStore.getState().setAccessToken(tokens.access_token)
-    
-    const user = await authApi.me()
     setAuth(tokens.access_token, user)
     // Run asynchronously so the browser permission prompt doesn't block login
     registerPushSubscription().catch(console.error)
@@ -25,10 +27,9 @@ export function useAuth() {
 
   const signup = async (email: string, password: string, timezone: string) => {
     const tokens = await authApi.signup({ email, password, timezone })
+    // Same ordering fix as login — fetch user before touching the store.
+    const user = await authApi.meWithToken(tokens.access_token)
     localStorage.setItem('refresh_token', tokens.refresh_token)
-    useAuthStore.getState().setAccessToken(tokens.access_token)
-    
-    const user = await authApi.me()
     setAuth(tokens.access_token, user)
     // Run asynchronously so the browser permission prompt doesn't block signup
     registerPushSubscription().catch(console.error)

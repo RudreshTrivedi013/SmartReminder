@@ -111,6 +111,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   clearAuth: () => {
     localStorage.removeItem('refresh_token')
     idbClearToken()
+    // Remove the default header that refreshAccessToken() sets so a stale
+    // Bearer token cannot leak into the next login request.
+    import('@/api/axios').then(({ api }) => {
+      delete (api.defaults.headers.common as Record<string, unknown>)['Authorization']
+    })
     set({ accessToken: null, user: null, isAuthenticated: false })
   },
 }))

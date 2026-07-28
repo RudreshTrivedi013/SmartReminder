@@ -16,5 +16,14 @@ export const authApi = {
 
   me: () => api.get<User>('/auth/me').then((r) => r.data),
 
+  // Fetch the current user with an explicit token instead of reading from the
+  // store.  Used during login/signup so a newly-issued access token is sent
+  // directly without triggering the 401-interceptor refresh race that can
+  // occur when an old stale token is still in the store at that moment.
+  meWithToken: (token: string) =>
+    api
+      .get<User>('/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.data),
+
   updateMe: (data: UserUpdate) => api.patch<User>('/auth/me', data).then((r) => r.data),
 }

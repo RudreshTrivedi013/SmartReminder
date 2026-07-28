@@ -40,14 +40,37 @@ async function initApp() {
       // Attempt to fetch user to fully hydrate auth state.
       const user = await authApi.me()
       useAuthStore.getState().setAuth(token, user)
-    } catch {
-      // Token is expired or invalid — wipe ALL stale state so the user
-      // lands on a clean login/signup page without a corrupted auth context.
-      // This prevents the Axios interceptor from attaching a bad token to
-      // login/signup requests and triggering a false "Network Error".
-      localStorage.removeItem('refresh_token')
-      await idbClearToken()
-      useAuthStore.getState().clearAuth()
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status
+
+      if (status === 401) {
+        // Access token is expired — try the refresh token before giving up.
+        // This is the normal path after a 30-min access-token lifetime elapses.
+        const storedRefresh = localStorage.getItem('refresh_token')
+        if (storedRefresh) {
+          try {
+            const { refreshAccessToken } = await import('./api/axios')
+            const newAccess = await refreshAccessToken()
+            const user = await authApi.me()
+            useAuthStore.getState().setAuth(newAccess, user)
+          } catch {
+            // Refresh token is also invalid/expired — truly logged out.
+            localStorage.removeItem('refresh_token')
+            await idbClearToken()
+            useAuthStore.getState().clearAuth()
+          }
+        } else {
+          // No refresh token stored — clean up the stale access token.
+          await idbClearToken()
+          useAuthStore.getState().clearAuth()
+        }
+      }
+      // For network errors (status undefined) or any non-401 server error,
+      // we leave the refresh_token in localStorage intact.  The user stays
+      // "authenticated" in the store with the cached token; the proactive
+      // refresh hook and the 401 interceptor will recover as soon as
+      // connectivity is restored.  This prevents early logout on a bad
+      // connection at startup.
     }
   }
 
