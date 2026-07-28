@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 
 # pyrefly: ignore [missing-import]
 import redis.asyncio as aioredis
@@ -47,8 +47,17 @@ async def refresh_token(
     redis: aioredis.Redis = Depends(get_redis),
 ):
     # Reject blocklisted tokens (already used or explicitly logged out).
-    if await redis.get(_blocklist_key(payload.refresh_token)):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token has been revoked")
+    block_val = await redis.get(_blocklist_key(payload.refresh_token))
+    if block_val:
+        try:
+            # Check if it was blocklisted within the last 60 seconds (grace period)
+            block_time = float(block_val.decode('utf-8'))
+            now = datetime.now(timezone.utc).timestamp()
+            if now - block_time > 60:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token has been revoked")
+        except ValueError:
+            # If it's an explicit logout ("1"), reject it immediately
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token has been revoked")
 
     try:
         data = decode_token(payload.refresh_token)
@@ -61,8 +70,10 @@ async def refresh_token(
     new_refresh = create_refresh_token(data["sub"])
 
     # Token rotation: invalidate the used refresh token so it can't be reused.
+    # Store the timestamp of invalidation to support the 60s grace period.
     ttl = int(timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS).total_seconds())
-    await redis.setex(_blocklist_key(payload.refresh_token), ttl, "1")
+    now_ts = str(datetime.now(timezone.utc).timestamp())
+    await redis.setex(_blocklist_key(payload.refresh_token), ttl, now_ts)
 
     return TokenResponse(access_token=new_access, refresh_token=new_refresh)
 
